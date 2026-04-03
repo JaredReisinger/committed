@@ -1,2 +1,5 @@
 # ignore build binaries
-.build
+.build/
+
+# ignore temp MSG file...
+MSG
