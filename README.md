@@ -17,6 +17,15 @@ Install as a `prepare-commit-msg` hook:
 ```bash
 # In your git repository
 ln -s $(which committed) .git/hooks/prepare-commit-msg
+```
+
+or create a `.git/hooks/prepare-commit-msg` file that leverages it:
+```bash
+cat <<EOF > .git/hooks/prepare-commit-msg
+#!/usr/bin/sh
+committed $@
+EOF
+
 chmod +x .git/hooks/prepare-commit-msg
 ```
 
@@ -24,18 +33,22 @@ Now when you run `git commit`, the TUI will appear to help format your commit me
 
 ### Manual Usage
 
-You can also run the tool manually:
+You can also run the tool manually; it will load/edit the given file:
 
 ```bash
-committed hook /path/to/COMMIT_EDITMSG
+committed /path/to/COMMIT_EDITMSG message
 ```
+
+> [!NOTE]
+>
+> The `message` argument is important, it's part of the `prepare-commit-msg` API. Perhaps in the future I'll make `committed` a bit more forgiving.
 
 ## Configuration
 
 The tool automatically detects conventional commit configuration from:
 
 1. `.commitlintrc.json`
-2. `.commitlintrc.yaml` / `.commitlintrc.yml`
+2. `.commitlintrc.{yaml,yml}`
 3. `package.json` (commitizen field)
 
 ### Example `.commitlintrc.json`
@@ -59,13 +72,15 @@ The tool automatically detects conventional commit configuration from:
 
 ## Development
 
+We leverage [`task`](https://taskfile.dev) to manage testing and building.
+
 ```bash
 # Run tests
-go test ./...
+task test
 
 # Build
-go build -o committed .
+task build
 
 # Install locally
-go install .
+task install
 ```
