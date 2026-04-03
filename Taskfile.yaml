@@ -1,0 +1,30 @@
+version: '3'
+
+tasks:
+  test:
+    desc: Run all Go tests
+    cmds:
+      - go test ./...
+
+  clean:
+    desc: Remove built artifacts
+    cmds:
+      - rm -rf .build
+
+  build:
+    desc: Build the committed binary into .build/committed
+    cmds:
+      - mkdir -p .build
+      - go build -o .build/committed .
+
+  install:
+    desc: Build and install from .build/committed
+    cmds:
+      - task: build
+      - cp .build/committed $(go env GOPATH)/bin/committed
+
+  lint:
+    desc: Run go vet and go test as a lightweight lint step
+    cmds:
+      - go vet ./...
+      - go test ./...
