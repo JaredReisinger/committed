@@ -1,6 +1,21 @@
 version: '3'
 
 tasks:
+  run:
+    desc: Run as-is
+    cmds:
+      - go run ./... {{.CLI_ARGS}}
+
+  example:
+    desc: Run example case (dummy test file)
+    aliases: [ ex ]
+    cmds:
+      - 'printf "chore: dummy message\n\nYou can edit this.\n" > MSG'
+      - task: run
+        vars: { CLI_ARGS: MSG message }
+      - cat MSG
+      - rm MSG
+
   test:
     desc: Run all Go tests
     cmds:
@@ -19,8 +34,9 @@ tasks:
 
   install:
     desc: Build and install from .build/committed
+    deps:
+      - build
     cmds:
-      - task: build
       - cp .build/committed $(go env GOPATH)/bin/committed
 
   lint:
