@@ -19,7 +19,7 @@ var rootCmd = &cobra.Command{
 	Short: "Interactive conventional-commit assistant",
 	Long:  "A Go TUI that helps format conventional commit messages and can integrate with git hooks.",
 	Args:  cobra.RangeArgs(1, 3),
-	Run:   runHook,
+	Run:   runRoot,
 }
 
 func Execute() {
@@ -29,17 +29,10 @@ func Execute() {
 	}
 }
 
-func runHook(cmd *cobra.Command, args []string) {
+func runRoot(cmd *cobra.Command, args []string) {
 	// Build hook args matching hook.ParseHookArgs expectations: [program, message-file, source?, sha1?]
 	hookArgs := make([]string, len(os.Args))
 	copy(hookArgs, os.Args)
-
-	if cmd.Name() == "hook" {
-		// remove the "hook" subcommand argument for parse
-		if len(hookArgs) > 1 {
-			hookArgs = append(hookArgs[:1], hookArgs[2:]...)
-		}
-	}
 
 	hookCtx, err := hook.ParseHookArgs(hookArgs)
 	if err != nil {

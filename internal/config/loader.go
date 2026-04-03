@@ -11,9 +11,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-var ErrNoConfigFound = errors.New("no commit configuration found")
-
-// LoadConfig reads conventional commit config from .commitlintrc.json, .commitlintrc.yaml, or package.json.
+// LoadConfig reads conventional commit config from .commitlintrc.json,
+// .commitlintrc.yaml, or package.json.
 func LoadConfig(workDir string) (*Config, error) {
 	paths := []string{
 		".commitlintrc.json",
@@ -50,7 +49,7 @@ func parseConfigFile(path string) (*Config, error) {
 	ext := filepath.Ext(path)
 	cfg := DefaultConfig()
 
-	if path == "package.json" || filepath.Base(path) == "package.json" {
+	if /*path == "package.json" ||*/ filepath.Base(path) == "package.json" {
 		var raw map[string]any
 		if err := json.Unmarshal(data, &raw); err != nil {
 			return nil, err
@@ -90,6 +89,7 @@ func parseConfigFile(path string) (*Config, error) {
 	return nil, fmt.Errorf("unsupported config extension: %s", ext)
 }
 
+// We'll need more comprehensive testing of rule types, I suspect.
 func applyCommitlintRules(cfg *Config, rules map[string]any) {
 	if rules == nil {
 		return
