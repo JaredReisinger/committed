@@ -1,6 +1,7 @@
 package config
 
-// Config contains the conventional commit conventions we use for TUI validation.
+// Config contains the conventional commit conventions we use for TUI
+// validation.
 type Config struct {
 	Types             []string `json:"types" yaml:"types"`
 	Scopes            []string `json:"scopes" yaml:"scopes"`
@@ -9,12 +10,25 @@ type Config struct {
 	HeaderMaxLength   int      `json:"headerMaxLength" yaml:"headerMaxLength"`
 }
 
+// DefaultConfig is based on @commitlint/config-conventional values.
 func DefaultConfig() *Config {
 	return &Config{
-		Types:             []string{"feat", "fix", "docs", "style", "refactor", "perf", "test", "chore", "revert"},
+		Types: []string{ // ordered (not alphabetical!) based on common usage(?)
+			"feat",
+			"fix",
+			"docs",
+			"style",
+			"refactor",
+			"perf",
+			"test",
+			"chore",
+			"revert",
+			"build",
+			"ci",
+		},
 		Scopes:            []string{},
-		SubjectMaxLength:  72,
+		SubjectMaxLength:  100, // not really used, only HeaderMax is
 		BodyMaxLineLength: 100,
-		HeaderMaxLength:   72,
+		HeaderMaxLength:   100,
 	}
 }

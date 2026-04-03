@@ -49,6 +49,7 @@ func parseConfigFile(path string) (*Config, error) {
 	ext := filepath.Ext(path)
 	cfg := DefaultConfig()
 
+	// could look in package.json for "commitlint" as well!
 	if /*path == "package.json" ||*/ filepath.Base(path) == "package.json" {
 		var raw map[string]any
 		if err := json.Unmarshal(data, &raw); err != nil {
@@ -64,6 +65,7 @@ func parseConfigFile(path string) (*Config, error) {
 		return cfg, nil
 	}
 
+	// these both assume commmitlintrc, which is sloppy
 	if ext == ".json" {
 		var raw struct {
 			Rules map[string]any `json:"rules"`
