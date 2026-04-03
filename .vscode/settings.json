@@ -7,7 +7,11 @@
         "commitlintrc",
         "commmitlintrc",
         "conventionalcommit",
+        "coverprofile",
         "EDITMSG",
+        "gcov",
+        "GOPATH",
+        "infile",
         "leodido",
         "sandboxing",
         "textinput"

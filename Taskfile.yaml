@@ -1,13 +1,18 @@
 version: '3'
 
+vars:
+  APP_NAME: committed
+  BUILD_DIR: .build
+  COV_DIR: .coverage
+
 tasks:
   run:
-    desc: Run as-is
+    desc: run from code
     cmds:
       - go run ./... {{.CLI_ARGS}}
 
   example:
-    desc: Run example case (dummy test file)
+    desc: run example case (dummy test file)
     aliases: [ ex ]
     cmds:
       - 'printf "chore: dummy message\n\nYou can edit this.\n" > MSG'
@@ -17,36 +22,52 @@ tasks:
       - rm MSG
 
   test:
-    desc: Run all Go tests
+    desc: run all tests, create coverage
+    vars:
+      # COV_DIR: .coverage
+      COV_FILE: '{{.COV_DIR}}/coverage.out'
     cmds:
-      - mkdir -p .coverage
-      - go test ./... -coverprofile=.coverage/coverage.out
-      - go tool cover -html=.coverage/coverage.out -o .coverage/coverage.html
+      - mkdir -p {{.COV_DIR}}
+      - go test ./... -coverprofile={{.COV_FILE}}
+      - go tool cover -html={{.COV_FILE}} -o {{.COV_DIR}}/coverage.html
+      - go tool gcov2lcov -infile {{.COV_FILE}} -outfile {{.COV_DIR}}/lcov.info
+
+  test:watch:
+    desc: test in watch mode
+    watch: true
+    sources: [ '**/*.go' ]
+    cmds:
+      - task: test
 
   test:show:
-    desc: Run all Go tests, show coverage
+    desc: show test coverage
     deps:
       - test
     cmds:
-      - xdg-open .coverage/coverage.html
+      - xdg-open {{.COV_DIR}}/coverage.html
 
   clean:
-    desc: Remove built artifacts
+    desc: clean all generated files
     cmds:
-      - rm -rf .build
+      - rm -rf {{.BUILD_DIR}}
+      - rm -rf {{.COV_DIR}}
 
   build:
-    desc: Build the committed binary into .build/committed
+    desc: build the binary to '{{.BUILD_DIR}}/{{.APP_NAME}}'
     cmds:
-      - mkdir -p .build
-      - go build -o .build/committed .
+      - mkdir -p '{{.BUILD_DIR}}'
+      - go build -o '{{.BUILD_DIR}}/{{.APP_NAME}}' .
 
   install:
-    desc: Build and install from .build/committed
+    desc: install from '{{.BUILD_DIR}}/{{.APP_NAME}}'
+    vars:
+      GOPATH:
+        sh: go env GOPATH
     deps:
       - build
     cmds:
-      - cp .build/committed $(go env GOPATH)/bin/committed
+      # should this use `go install` instead?
+      - cp '{{.BUILD_DIR}}/{{.APP_NAME}}' '{{.GOPATH}}/bin/{{.APP_NAME}}'
 
   lint:
     desc: Run go vet and go test as a lightweight lint step
