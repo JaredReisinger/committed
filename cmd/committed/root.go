@@ -1,4 +1,4 @@
-package committed
+package main
 
 import (
 	"fmt"
