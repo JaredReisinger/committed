@@ -18,7 +18,13 @@ var hookCmd = &cobra.Command{
 	Args:  cobra.RangeArgs(1, 3),
 	Run: func(cmd *cobra.Command, args []string) {
 		// Parse hook arguments
-		hookCtx, err := hook.ParseHookArgs(os.Args)
+		hookArgs := make([]string, len(os.Args))
+		copy(hookArgs, os.Args)
+		// Replace the subcommand with the program name for ParseHookArgs
+		hookArgs[1] = hookArgs[0] // program name
+		hookArgs = hookArgs[1:]   // remove the "hook" subcommand
+
+		hookCtx, err := hook.ParseHookArgs(hookArgs)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error parsing hook arguments: %v\n", err)
 			os.Exit(1)
