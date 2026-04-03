@@ -1,5 +1,6 @@
-# ignore build binaries
+# ignore build binaries amd coverage output
 .build/
+.coverage/
 
 # ignore temp MSG file...
 MSG

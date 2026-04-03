@@ -19,7 +19,16 @@ tasks:
   test:
     desc: Run all Go tests
     cmds:
-      - go test ./...
+      - mkdir -p .coverage
+      - go test ./... -coverprofile=.coverage/coverage.out
+      - go tool cover -html=.coverage/coverage.out -o .coverage/coverage.html
+
+  test:show:
+    desc: Run all Go tests, show coverage
+    deps:
+      - test
+    cmds:
+      - xdg-open .coverage/coverage.html
 
   clean:
     desc: Remove built artifacts

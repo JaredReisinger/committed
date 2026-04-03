@@ -1,0 +1,15 @@
+{
+  "# NOTE": "commitlint isn't handled yet!",
+  "commitlint": {
+    "rules": {
+      "type-enum": [2, "always", ["feat", "fix"]],
+      "subject-max-length": [2, "always", 50]
+    }
+  },
+  "commitizen": {
+    "rules": {
+      "type-enum": [2, "always", ["feat", "fix"]],
+      "subject-max-length": [2, "always", 50]
+    }
+  }
+}

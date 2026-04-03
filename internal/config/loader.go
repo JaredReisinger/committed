@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -40,109 +41,56 @@ func LoadConfig(workDir string) (*Config, error) {
 	return DefaultConfig(), nil
 }
 
+// We really need to struct drive this...
+
+type packageJson struct {
+	Commitlint *commitlintCfg `json:"commitlint"`
+	Commitizen any            `json:"commitizen"`
+}
+
 func parseConfigFile(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
 
-	ext := filepath.Ext(path)
+	file := filepath.Base(path)
+	ext := filepath.Ext(file)
+	base := strings.TrimSuffix(file, ext)
 	cfg := DefaultConfig()
 
-	// could look in package.json for "commitlint" as well!
-	if /*path == "package.json" ||*/ filepath.Base(path) == "package.json" {
-		var raw map[string]any
-		if err := json.Unmarshal(data, &raw); err != nil {
+	switch base {
+	case ".commitlintrc":
+		raw := commitlintCfg{}
+		switch ext {
+		case ".json":
+			err = json.Unmarshal(data, &raw)
+		case ".yaml", ".yml":
+			err = yaml.Unmarshal(data, &raw)
+		}
+		if err != nil {
 			return nil, err
 		}
-		if commitizen, ok := raw["commitizen"]; ok {
-			if czMap, ok := commitizen.(map[string]any); ok {
-				if pathStr, ok := czMap["path"].(string); ok {
-					cfg.Types = []string{pathStr}
-				}
-			}
-		}
-		return cfg, nil
-	}
 
-	// these both assume commmitlintrc, which is sloppy
-	if ext == ".json" {
-		var raw struct {
-			Rules map[string]any `json:"rules"`
-		}
-		if err := json.Unmarshal(data, &raw); err != nil {
-			return nil, err
-		}
+		// should take more than rules!
 		applyCommitlintRules(cfg, raw.Rules)
 		return cfg, nil
-	}
 
-	if ext == ".yaml" || ext == ".yml" {
-		var raw struct {
-			Rules map[string]any `yaml:"rules"`
+	case "package":
+		if ext != ".json" {
+			return nil, errors.New("bad extension")
 		}
-		if err := yaml.Unmarshal(data, &raw); err != nil {
+		raw := packageJson{}
+		err = json.Unmarshal(data, &raw)
+		if err != nil {
 			return nil, err
 		}
-		applyCommitlintRules(cfg, raw.Rules)
-		return cfg, nil
+
+		if raw.Commitlint != nil {
+			applyCommitlintRules(cfg, raw.Commitlint.Rules)
+			return cfg, nil
+		}
 	}
 
 	return nil, fmt.Errorf("unsupported config extension: %s", ext)
-}
-
-// We'll need more comprehensive testing of rule types, I suspect.
-func applyCommitlintRules(cfg *Config, rules map[string]any) {
-	if rules == nil {
-		return
-	}
-
-	if t, ok := rules["type-enum"]; ok {
-		if arr, ok := t.([]any); ok && len(arr) >= 3 {
-			if list, ok := arr[2].([]any); ok {
-				cfg.Types = make([]string, 0, len(list))
-				for _, item := range list {
-					if s, ok := item.(string); ok {
-						cfg.Types = append(cfg.Types, s)
-					}
-				}
-			}
-		}
-	}
-
-	if s, ok := rules["subject-max-length"]; ok {
-		if arr, ok := s.([]any); ok && len(arr) >= 3 {
-			if n, ok := arr[2].(int); ok {
-				cfg.SubjectMaxLength = n
-			} else if n, ok := arr[2].(float64); ok {
-				cfg.SubjectMaxLength = int(n)
-			} else if n, ok := arr[2].(int64); ok {
-				cfg.SubjectMaxLength = int(n)
-			}
-		}
-	}
-
-	if b, ok := rules["body-max-line-length"]; ok {
-		if arr, ok := b.([]any); ok && len(arr) >= 3 {
-			if n, ok := arr[2].(int); ok {
-				cfg.BodyMaxLineLength = n
-			} else if n, ok := arr[2].(float64); ok {
-				cfg.BodyMaxLineLength = int(n)
-			} else if n, ok := arr[2].(int64); ok {
-				cfg.BodyMaxLineLength = int(n)
-			}
-		}
-	}
-
-	if h, ok := rules["header-max-length"]; ok {
-		if arr, ok := h.([]any); ok && len(arr) >= 3 {
-			if n, ok := arr[2].(int); ok {
-				cfg.HeaderMaxLength = n
-			} else if n, ok := arr[2].(float64); ok {
-				cfg.HeaderMaxLength = int(n)
-			} else if n, ok := arr[2].(int64); ok {
-				cfg.HeaderMaxLength = int(n)
-			}
-		}
-	}
 }
