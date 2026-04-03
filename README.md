@@ -85,3 +85,5 @@ task build
 # Install locally
 task install
 ```
+
+Also, tool dependencies (like gcov2lcov) are now managed via the ([as of Go 1.24](https://go.dev/doc/modules/managing-dependencies#tools)) `go get -tool ...` command, so things like `go mod tidy` will automatically fetch them. Additionally, there is a `task prepare` command that functions semantically like `npm install`... it fetches dependencies and performs other one-time post-clone steps.

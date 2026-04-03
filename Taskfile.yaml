@@ -6,6 +6,12 @@ vars:
   COV_DIR: .coverage
 
 tasks:
+  prepare:
+    desc: one-time post-clone repo setup
+    cmds:
+      - go mod tidy
+      - 'echo "NYI: bootstrapping committed as the prepare-commit-msg hook?"'
+
   run:
     desc: run from code
     cmds:
