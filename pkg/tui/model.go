@@ -33,7 +33,7 @@ type Model struct {
 }
 
 // NewModel creates a new TUI model with the given configuration and optional existing message.
-func NewModel(cfg *config.Config, existing *commit.Message) Model {
+func NewModel(cfg *config.Config, existingMsg *commit.Message) Model {
 	ti := textinput.New()
 	ti.Placeholder = "Select commit type"
 	ti.CharLimit = 50
@@ -47,7 +47,7 @@ func NewModel(cfg *config.Config, existing *commit.Message) Model {
 
 	m := Model{
 		config:       cfg,
-		existingMsg:  existing,
+		existingMsg:  existingMsg,
 		focusedField: typeField,
 		typeInput:    ti,
 		summaryInput: si,
@@ -56,7 +56,7 @@ func NewModel(cfg *config.Config, existing *commit.Message) Model {
 	}
 
 	// Pre-populate fields if we have an existing message
-	if existing != nil {
+	if existingMsg != nil {
 		m.populateFromExisting()
 	}
 
