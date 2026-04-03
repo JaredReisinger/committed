@@ -5,7 +5,7 @@ A Go-native, bubbletea-powered TUI that integrates as a proper prepare-commit-ms
 ## Installation
 
 ```bash
-go install github.com/jaredreisinger/committed/cmd/committed@latest
+go install github.com/jaredreisinger/committed@latest
 ```
 
 ## Usage
@@ -64,8 +64,8 @@ The tool automatically detects conventional commit configuration from:
 go test ./...
 
 # Build
-go build -o committed ./cmd/committed
+go build -o committed .
 
 # Install locally
-go install ./cmd/committed
+go install .
 ```

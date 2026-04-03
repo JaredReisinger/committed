@@ -46,8 +46,9 @@ Build a go-native, bubbletea-powered TUI that integrates as a `prepare-commit-ms
 **Tasks**:
 1. Initialize Go module: `go mod init github.com/jaredreisinger/committed`
 2. Create project structure:
-   - `cmd/committed/main.go` — Entry point
-   - `cmd/committed/hook.go` — Cobra hook subcommand
+   - `main.go` — Entry point
+   - `cmd/root.go` — Cobra root command
+   - `cmd/hook.go` — Cobra hook subcommand
    - `pkg/` — Public packages (tui, commit)
    - `internal/` — Private packages (config, hook)
 3. Set up Cobra CLI with root command:
@@ -253,7 +254,7 @@ Build a go-native, bubbletea-powered TUI that integrates as a `prepare-commit-ms
 **Goal**: Wire all components together and handle prepare-commit-msg hook contract
 
 **Tasks**:
-1. In `cmd/committed/hook.go`, implement the hook subcommand:
+1. In `cmd/hook.go`, implement the hook subcommand:
    - Parse hook parameters (filename, source type) via `internal/hook/handler.go`
    - Load project config via `internal/config/loader.go`
    - Read existing message from file via `internal/hook/handler.go`
