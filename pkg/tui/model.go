@@ -6,6 +6,7 @@ import (
 
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
+
 	"github.com/jaredreisinger/committed/internal/config"
 	"github.com/jaredreisinger/committed/pkg/commit"
 )
