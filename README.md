@@ -20,6 +20,7 @@ ln -s $(which committed) .git/hooks/prepare-commit-msg
 ```
 
 or create a `.git/hooks/prepare-commit-msg` file that leverages it:
+
 ```bash
 cat <<EOF > .git/hooks/prepare-commit-msg
 #!/usr/bin/sh
