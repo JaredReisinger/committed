@@ -9,8 +9,8 @@ import (
 	"github.com/jaredreisinger/committed/pkg/tui"
 )
 
-func Run(args []string) error {
-	hookCtx, err := hook.ParseHookArgs(args)
+func Run(args []string, dryRun bool) error {
+	file, _, _, err := hook.ExtractArgs(args, dryRun)
 	if err != nil {
 		return errors.WithMessage(err, "error parsing hook arguments")
 	}
@@ -20,28 +20,27 @@ func Run(args []string) error {
 		return errors.WithMessage(err, "error loading config")
 	}
 
-	existingContent, err := hook.ReadMessageFile(hookCtx.MessageFilePath)
-	if err != nil {
-		return errors.WithMessage(err, "error reading commit message")
-	}
+	var incoming string
 
-	var existingMsg *commit.Message
-	if existingContent != "" {
-		parsed, err := commit.ParseMessage(existingContent)
+	if file != "" {
+		incoming, err = hook.ReadMessageFile(file)
 		if err != nil {
-			existingMsg = &commit.Message{Description: "", Body: existingContent}
-		} else {
-			existingMsg = parsed
+			return errors.WithMessage(err, "error reading commit message")
 		}
 	}
 
-	finalMsg, err := tui.Run(cfg, existingMsg)
+	// ParseMessage should *really* take the config, shouldn't it?
+	msg, err := commit.ParseMessage(incoming)
 	if err != nil {
-		return errors.WithMessage(err, "error running TUI")
+		msg = &commit.Message{Body: incoming}
 	}
 
-	formatted := finalMsg.String()
-	err = hook.WriteMessageFile(hookCtx.MessageFilePath, formatted)
+	msg, err = tui.Run(cfg, msg)
+	if err != nil {
+		return err
+	}
+
+	err = hook.WriteMessageFile(file, msg.String())
 	if err != nil {
 		return errors.WithMessage(err, "error writing commit message")
 	}

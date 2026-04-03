@@ -10,15 +10,16 @@ import (
 )
 
 func Run(cfg *config.Config, existingMsg *commit.Message) (*commit.Message, error) {
-	model := NewModel(cfg, existingMsg)
-	p := tea.NewProgram(model)
+	m := newModel(cfg, existingMsg)
+
+	p := tea.NewProgram(m)
 
 	finalModel, err := p.Run()
 	if err != nil {
-		return nil, errors.WithMessage(err, "error running TUI")
+		return nil, err
 	}
 
-	tuiModel, ok := finalModel.(Model)
+	tuiModel, ok := finalModel.(formModel)
 	if !ok {
 		return nil, errors.WithMessage(err, "unexpected model type")
 	}

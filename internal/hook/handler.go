@@ -6,26 +6,33 @@ import (
 	"os"
 )
 
-// ParseHookArgs parses command line arguments from prepare-commit-msg hook.
+// ExtractArgs parses command line arguments from prepare-commit-msg hook.
 // The hook receives: <commit-msg-file> [<source>] [<SHA1>]
-func ParseHookArgs(args []string) (*HookContext, error) {
-	if len(args) < 2 {
-		return nil, errors.New("insufficient arguments: expected at least message file path")
+func ExtractArgs(args []string, dryRun bool) (file string, source string, ref string, err error) {
+	c := len(args)
+
+	if c <= 0 && !dryRun {
+		err = errors.New("insufficient arguments: expected at least message file path")
+		return
 	}
 
-	ctx := &HookContext{
-		MessageFilePath: args[1], // args[0] is program name, args[1] is message file
+	switch c {
+	default:
+		fallthrough
+	case 3:
+		ref = args[2]
+		fallthrough
+	case 2:
+		source = args[1]
+		fallthrough
+	case 1:
+		file = args[0]
+		fallthrough
+	case 0:
+		// no-op
 	}
 
-	if len(args) >= 3 {
-		ctx.SourceType = args[2]
-	}
-
-	if len(args) >= 4 {
-		ctx.SourceObject = args[3]
-	}
-
-	return ctx, nil
+	return
 }
 
 // ReadMessageFile reads the commit message from the specified file.

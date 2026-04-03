@@ -4,88 +4,72 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/go-openapi/testify/v2/assert"
 )
 
-func TestParseHookArgs(t *testing.T) {
+func TestExtractArgs(t *testing.T) {
+	const file = "/path/to/.git/COMMIT_EDITMSG"
+
 	tests := []struct {
-		name     string
-		args     []string
-		expected *HookContext
-		hasError bool
+		name           string
+		args           []string
+		dryRun         bool
+		expectedFile   string
+		expectedSource string
+		expectedRef    string
+		hasError       bool
 	}{
 		{
 			name:     "insufficient args",
-			args:     []string{"program"},
-			expected: nil,
+			args:     []string{},
 			hasError: true,
 		},
 		{
-			name: "minimum args",
-			args: []string{"program", "/path/to/.git/COMMIT_EDITMSG"},
-			expected: &HookContext{
-				MessageFilePath: "/path/to/.git/COMMIT_EDITMSG",
-				SourceType:      "",
-				SourceObject:    "",
-			},
-			hasError: false,
+			name:   "insufficient args allowed for dry run",
+			args:   []string{},
+			dryRun: true,
 		},
 		{
-			name: "with source type",
-			args: []string{"program", "/path/to/.git/COMMIT_EDITMSG", "message"},
-			expected: &HookContext{
-				MessageFilePath: "/path/to/.git/COMMIT_EDITMSG",
-				SourceType:      "message",
-				SourceObject:    "",
-			},
-			hasError: false,
+			name:         "minimum args",
+			args:         []string{file},
+			expectedFile: file,
 		},
 		{
-			name: "with source and object",
-			args: []string{"program", "/path/to/.git/COMMIT_EDITMSG", "commit", "abc123"},
-			expected: &HookContext{
-				MessageFilePath: "/path/to/.git/COMMIT_EDITMSG",
-				SourceType:      "commit",
-				SourceObject:    "abc123",
-			},
-			hasError: false,
+			name:           "with source type",
+			args:           []string{file, "message"},
+			expectedFile:   file,
+			expectedSource: "message",
 		},
 		{
-			name: "extra args ignored",
-			args: []string{"program", "/path/to/.git/COMMIT_EDITMSG", "merge", "abc123", "extra"},
-			expected: &HookContext{
-				MessageFilePath: "/path/to/.git/COMMIT_EDITMSG",
-				SourceType:      "merge",
-				SourceObject:    "abc123",
-			},
-			hasError: false,
+			name:           "with source and object",
+			args:           []string{file, "commit", "abc123"},
+			expectedFile:   file,
+			expectedSource: "commit",
+			expectedRef:    "abc123",
+		},
+		{
+			name:           "extra args ignored",
+			args:           []string{file, "merge", "abc123", "extra"},
+			expectedFile:   file,
+			expectedSource: "merge",
+			expectedRef:    "abc123",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := ParseHookArgs(tt.args)
+			actualFile, actualSource, actualRef, err := ExtractArgs(tt.args, tt.dryRun)
 
 			if tt.hasError {
-				if err == nil {
-					t.Error("expected error but got none")
-				}
-				return
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
 			}
 
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-				return
-			}
-
-			if result.MessageFilePath != tt.expected.MessageFilePath {
-				t.Errorf("expected MessageFilePath %q, got %q", tt.expected.MessageFilePath, result.MessageFilePath)
-			}
-			if result.SourceType != tt.expected.SourceType {
-				t.Errorf("expected SourceType %q, got %q", tt.expected.SourceType, result.SourceType)
-			}
-			if result.SourceObject != tt.expected.SourceObject {
-				t.Errorf("expected SourceObject %q, got %q", tt.expected.SourceObject, result.SourceObject)
-			}
+			assert.Equal(t, tt.expectedFile, actualFile)
+			assert.Equal(t, tt.expectedSource, actualSource)
+			assert.Equal(t, tt.expectedRef, actualRef)
 		})
 	}
 }
