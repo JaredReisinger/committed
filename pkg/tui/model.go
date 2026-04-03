@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
 	"github.com/jaredreisinger/committed/internal/config"
 	"github.com/jaredreisinger/committed/pkg/commit"
 )
@@ -36,16 +36,13 @@ func NewModel(cfg *config.Config, existing *commit.Message) Model {
 	ti := textinput.New()
 	ti.Placeholder = "Select commit type"
 	ti.CharLimit = 50
-	ti.Width = 50
 
 	si := textinput.New()
 	si.Placeholder = "Brief description of changes"
 	si.CharLimit = cfg.SubjectMaxLength
-	si.Width = 72
 
 	di := textinput.New()
 	di.Placeholder = "Detailed description (optional)"
-	di.Width = 72
 
 	m := Model{
 		config:       cfg,
@@ -228,7 +225,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // View renders the TUI.
-func (m Model) View() string {
+func (m Model) View() tea.View {
 	var b strings.Builder
 
 	b.WriteString("Compose Conventional Commit\n\n")
@@ -268,7 +265,7 @@ func (m Model) View() string {
 	// Help text
 	b.WriteString("Tab/Shift+Tab: navigate • Enter: next/submit • Esc/Ctrl+C: cancel")
 
-	return b.String()
+	return tea.NewView(b.String())
 }
 
 // Result returns the composed commit message and any error.
