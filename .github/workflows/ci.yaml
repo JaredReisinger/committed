@@ -28,5 +28,23 @@ jobs:
 
       - run: task release:test
 
-      - if: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
-        run: task tag-release
+  tag-release:
+    if: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
+    needs: ci
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - uses: go-task/setup-task@v2
+
+      # should this just use `gh`? we could even get the new version from
+      # the other job and avoid fetching, etc.
+      - run: task tag-release
