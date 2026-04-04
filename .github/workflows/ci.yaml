@@ -27,3 +27,6 @@ jobs:
       - run: task build
 
       - run: task release:test
+
+      - if: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
+        run: task tag-release
