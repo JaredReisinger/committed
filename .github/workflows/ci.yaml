@@ -39,6 +39,10 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
       - uses: go-task/setup-task@v2
 
       - run: task tag-release

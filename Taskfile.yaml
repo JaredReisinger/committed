@@ -91,7 +91,7 @@ tasks:
       - cmd: echo "svu says {{.VER_CUR}} -> {{.VER_NEXT}}"
         silent: true
       - if: '{{ne .VER_NEXT .VER_CUR}}'
-        task: tag-release
+        task: tag-release:ci
         vars:
           VERSION: '{{.VER_NEXT}}'
       - if: '{{eq .VER_NEXT .VER_CUR}}'
