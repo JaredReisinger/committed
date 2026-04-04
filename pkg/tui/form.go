@@ -400,14 +400,14 @@ func (m formModel) Result() (*commit.Message, error) {
 	// }
 
 	msg := &commit.Message{
-		Type:        "",
+		Type:        strings.TrimSpace(m.typ.Value()),
 		Description: strings.TrimSpace(m.summary.Value()),
 		Body:        strings.TrimSpace(m.details.Value()),
 	}
 
-	if len(m.config.Types) > 0 && m.typeIndex >= 0 && m.typeIndex < len(m.config.Types) {
-		msg.Type = m.config.Types[m.typeIndex]
-	}
+	// if len(m.config.Types) > 0 && m.typeIndex >= 0 && m.typeIndex < len(m.config.Types) {
+	// 	msg.Type = m.config.Types[m.typeIndex]
+	// }
 
 	return msg, nil
 }

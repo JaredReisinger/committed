@@ -23,8 +23,8 @@ func ParseMessage(raw string) (*Message, error) {
 	// Parse header (first line)
 	header := strings.TrimSpace(lines[0])
 	if err := parseHeader(header, msg); err != nil {
-		// If header parsing fails, treat entire message as description
-		msg.Description = raw
+		// If header parsing fails, treat entire message as body
+		msg.Body = raw
 		return msg, nil
 	}
 
