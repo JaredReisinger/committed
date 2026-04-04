@@ -11,12 +11,15 @@
         "EDITMSG",
         "gcov",
         "goarch",
+        "gomod",
         "GOPATH",
         "goreleaser",
         "infile",
         "leodido",
         "lipgloss",
         "sandboxing",
+        "sboms",
+        "sigstore",
         "textinput"
     ]
 }
