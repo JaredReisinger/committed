@@ -76,7 +76,21 @@ tasks:
       - cp '{{.BUILD_DIR}}/{{.APP_NAME}}' '{{.GOPATH}}/bin/{{.APP_NAME}}'
 
   lint:
-    desc: Run go vet and go test as a lightweight lint step
+    desc: run go vet and go test as a lightweight lint step
     cmds:
       - go vet ./...
       - go test ./...
+
+  release:test:
+    desc: test the release process
+    deps:
+      - lint
+      - build
+    env:
+      VER_CUR:
+        sh: go tool svu current
+      VER_NEXT:
+        sh: go tool svu next
+    cmds:
+      - echo "svu says ${VER_CUR} -> ${VER_NEXT}"
+      - go tool goreleaser --snapshot --skip=publish --verbose

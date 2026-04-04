@@ -2,6 +2,7 @@
 .build
 .coverage
 .task
+.dist/
 
 # ignore temp MSG file...
 MSG
