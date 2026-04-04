@@ -93,4 +93,4 @@ tasks:
         sh: go tool svu next
     cmds:
       - echo "svu says ${VER_CUR} -> ${VER_NEXT}"
-      - go tool goreleaser release --clean --snapshot --skip=publish {{.CLI_ARGS}}
+      - go tool goreleaser release --clean --snapshot --skip=publish --skip=sign --skip=sbom {{.CLI_ARGS}}
