@@ -28,11 +28,12 @@ jobs:
 
       - run: task release:test
 
-  tag-release:
+  release:
     if: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
     needs: ci
     runs-on: ubuntu-latest
     permissions:
+      attestations: write
       contents: write
     steps:
       - uses: actions/checkout@v6
@@ -46,3 +47,5 @@ jobs:
       - uses: go-task/setup-task@v2
 
       - run: task tag-release
+
+      - run: task release

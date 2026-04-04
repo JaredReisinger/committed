@@ -1,9 +1,10 @@
 name: release
 
-on:
-  push:
-    branches: []
-    tags: [ v* ]
+# disable for now...
+on: {}
+  # push:
+  #   branches: []
+  #   tags: [ v* ]
 
 jobs:
   release:
