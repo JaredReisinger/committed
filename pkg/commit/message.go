@@ -53,6 +53,8 @@ func (m *Message) String() string {
 		}
 	}
 
+	b.WriteString("\n")
+
 	return b.String()
 }
 

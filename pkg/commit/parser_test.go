@@ -126,7 +126,7 @@ func TestMessage_String(t *testing.T) {
 		},
 	}
 
-	expected := "feat(api): add user auth\n\nSome details here\n\nCloses: #123"
+	expected := "feat(api): add user auth\n\nSome details here\n\nCloses: #123\n"
 	actual := msg.String()
 
 	if actual != expected {

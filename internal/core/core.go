@@ -1,6 +1,8 @@
 package core
 
 import (
+	"fmt"
+
 	"github.com/pkg/errors"
 
 	"github.com/jaredreisinger/committed/internal/config"
@@ -40,9 +42,13 @@ func Run(args []string, dryRun bool) error {
 		return err
 	}
 
-	err = hook.WriteMessageFile(file, msg.String())
-	if err != nil {
-		return errors.WithMessage(err, "error writing commit message")
+	if !dryRun {
+		err = hook.WriteMessageFile(file, msg.String())
+		if err != nil {
+			return errors.WithMessage(err, "error writing commit message")
+		}
+	} else {
+		fmt.Printf("DRY-RUN: committed would have written:\n---\n%s---\n", msg.String())
 	}
 
 	return nil

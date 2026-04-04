@@ -1,51 +1,47 @@
 package tui
 
 import (
+	"charm.land/bubbles/v2/help"
 	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/textarea"
 )
 
 type keyMap struct {
-	Cancel key.Binding
-	Next   key.Binding
-	Prev   key.Binding
-	Enter  key.Binding
-
-	// Up     key.Binding
-	// Down   key.Binding
-
-	// cache help->keymap?
+	Cancel     key.Binding
+	NextSingle key.Binding
+	NextMulti  key.Binding
+	Prev       key.Binding
+	Submit     key.Binding
 }
 
 var defaultKeyMap = keyMap{
 	Cancel: key.NewBinding(
-		key.WithKeys("ctrl+c", "esc"),
-		key.WithHelp("ctrl+c/esc", "cancel"),
+		// key.WithKeys("ctrl+c", "esc"),
+		// key.WithHelp("ctrl+c/esc", "cancel"),
+		key.WithKeys("ctrl+c"),
+		key.WithHelp("ctrl+c", "cancel"),
 	),
 
-	Next: key.NewBinding(
+	NextSingle: key.NewBinding(
+		key.WithKeys("tab", "enter"),
+		key.WithHelp("tab/enter", "next field"),
+	),
+
+	NextMulti: key.NewBinding(
 		key.WithKeys("tab"),
-		key.WithHelp("tab", "next"),
+		key.WithHelp("tab", "next field"),
+		key.WithDisabled(),
 	),
 
 	Prev: key.NewBinding(
 		key.WithKeys("shift+tab"),
-		key.WithHelp("shift+tab", "previous"),
+		key.WithHelp("shift+tab", "previous field"),
 	),
 
-	Enter: key.NewBinding(
-		key.WithKeys("enter"),
-		key.WithHelp("enter", "accept / next"),
+	Submit: key.NewBinding(
+		key.WithKeys("ctrl+enter"),
+		key.WithHelp("ctrl+enter", ""),
 	),
-
-	// Up: key.NewBinding(
-	// 	key.WithKeys("k", "up"),        // actual keybindings
-	// 	key.WithHelp("↑/k", "move up"), // corresponding help text
-	// ),
-
-	// Down: key.NewBinding(
-	// 	key.WithKeys("j", "down"),
-	// 	key.WithHelp("↓/j", "move down"),
-	// ),
 }
 
 // func (k *keyMap) forHelp() help.KeyMap {
@@ -54,10 +50,102 @@ var defaultKeyMap = keyMap{
 
 func (k *keyMap) ShortHelp() []key.Binding {
 	return []key.Binding{
-		k.Next, k.Prev, k.Enter, k.Cancel,
+		k.NextSingle,
+		k.NextMulti,
+		k.Prev,
+		k.Cancel,
 	}
 }
 
 func (k *keyMap) FullHelp() [][]key.Binding {
 	return nil
+}
+
+func inTextareaKeyMap(taKeyMap textarea.KeyMap) help.KeyMap {
+	// combine maps
+	h := &helpMap{}
+	h.short = []key.Binding{
+		defaultKeyMap.NextSingle,
+		defaultKeyMap.NextMulti,
+		defaultKeyMap.Prev,
+		defaultKeyMap.Cancel,
+		taKeyMap.InsertNewline,
+
+		// taKeyMap.CharacterBackward,
+		// taKeyMap.CharacterForward,
+		taKeyMap.DeleteAfterCursor,
+		taKeyMap.DeleteBeforeCursor,
+		// taKeyMap.DeleteCharacterBackward,
+		// taKeyMap.DeleteCharacterForward,
+		taKeyMap.DeleteWordBackward,
+		taKeyMap.DeleteWordForward,
+		// taKeyMap.LineEnd,
+		// taKeyMap.LineNext,
+		// taKeyMap.LinePrevious,
+		// taKeyMap.LineStart,
+		// taKeyMap.PageUp,
+		// taKeyMap.PageDown,
+		taKeyMap.Paste,
+		taKeyMap.WordBackward,
+		taKeyMap.WordForward,
+		taKeyMap.InputBegin,
+		taKeyMap.InputEnd,
+		taKeyMap.UppercaseWordForward,
+		taKeyMap.LowercaseWordForward,
+		taKeyMap.CapitalizeWordForward,
+		taKeyMap.TransposeCharacterBackward,
+	}
+
+	// for full help we need "columns of bindings"
+	h.full = append(h.full,
+		[]key.Binding{
+			defaultKeyMap.NextSingle,
+			defaultKeyMap.NextMulti,
+			defaultKeyMap.Prev,
+			defaultKeyMap.Cancel,
+			taKeyMap.InsertNewline,
+			// taKeyMap.CharacterBackward,
+			// taKeyMap.CharacterForward,
+			taKeyMap.DeleteAfterCursor,
+			taKeyMap.DeleteBeforeCursor,
+		},
+		[]key.Binding{
+			// taKeyMap.DeleteCharacterBackward,
+			// taKeyMap.DeleteCharacterForward,
+			taKeyMap.DeleteWordBackward,
+			taKeyMap.DeleteWordForward,
+			// taKeyMap.LineEnd,
+			// taKeyMap.LineNext,
+			// taKeyMap.LinePrevious,
+			// taKeyMap.LineStart,
+			// taKeyMap.PageUp,
+			// taKeyMap.PageDown,
+			taKeyMap.Paste,
+			taKeyMap.WordBackward,
+			taKeyMap.WordForward,
+			taKeyMap.InputBegin,
+			taKeyMap.InputEnd,
+		},
+		[]key.Binding{
+			taKeyMap.UppercaseWordForward,
+			taKeyMap.LowercaseWordForward,
+			taKeyMap.CapitalizeWordForward,
+			taKeyMap.TransposeCharacterBackward,
+		},
+	)
+
+	return h
+}
+
+type helpMap struct {
+	short []key.Binding
+	full  [][]key.Binding
+}
+
+func (h *helpMap) ShortHelp() []key.Binding {
+	return h.short
+}
+
+func (h *helpMap) FullHelp() [][]key.Binding {
+	return h.full
 }

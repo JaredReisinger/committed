@@ -26,9 +26,15 @@ func DefaultConfig() *Config {
 			"build",
 			"ci",
 		},
-		Scopes:            []string{},
-		SubjectMaxLength:  100, // not really used, only HeaderMax is
+		Scopes: []string{},
+		// actual values...
+		SubjectMaxLength:  100,
 		BodyMaxLineLength: 100,
 		HeaderMaxLength:   100,
+
+		// // test values...
+		// SubjectMaxLength:  50,
+		// BodyMaxLineLength: 50,
+		// HeaderMaxLength:   50,
 	}
 }
