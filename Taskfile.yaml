@@ -125,5 +125,4 @@ tasks:
       - sh: '[ "${CI}" == "true" ]'
     cmds:
       # skipping signing for now
-      - echo "CI is [${CI}]"
       - go tool goreleaser release --clean --skip=sign

@@ -49,3 +49,6 @@ jobs:
       - run: task tag-release
 
       - run: task release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
