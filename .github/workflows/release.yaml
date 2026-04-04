@@ -1,13 +1,12 @@
-name: CI
+name: release
 
 on:
   push:
-    branches: [ main ]
-  pull_request: {}
-  workflow_dispatch: {} # manual trigger for testing
+    branches: []
+    tags: [ v* ]
 
 jobs:
-  ci:
+  release:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -19,11 +18,5 @@ jobs:
           go-version-file: go.mod
 
       - uses: go-task/setup-task@v2
-
-      - run: task lint
-
-      - run: task test
-
-      - run: task build
 
       - run: task release:test
