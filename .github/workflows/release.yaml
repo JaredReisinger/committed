@@ -19,4 +19,4 @@ jobs:
 
       - uses: go-task/setup-task@v2
 
-      - run: task release:test
+      - run: task release
