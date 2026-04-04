@@ -80,19 +80,13 @@ func TestReadMessageFile(t *testing.T) {
 
 	content := "feat: add new feature\n\nThis is a detailed description.\n\nCloses: #123\n"
 	err := os.WriteFile(filepath, []byte(content), 0o644)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	result, err := ReadMessageFile(filepath)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	expected := "feat: add new feature\n\nThis is a detailed description.\n\nCloses: #123"
-	if result != expected {
-		t.Errorf("expected %q, got %q", expected, result)
-	}
+	assert.Equal(t, expected, result)
 }
 
 func TestReadMessageFile_WithTrailingNewlines(t *testing.T) {
@@ -101,26 +95,18 @@ func TestReadMessageFile_WithTrailingNewlines(t *testing.T) {
 
 	content := "feat: add feature\n\n"
 	err := os.WriteFile(filepath, []byte(content), 0o644)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	result, err := ReadMessageFile(filepath)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	expected := "feat: add feature"
-	if result != expected {
-		t.Errorf("expected %q, got %q", expected, result)
-	}
+	assert.Equal(t, expected, result)
 }
 
 func TestReadMessageFile_Nonexistent(t *testing.T) {
 	_, err := ReadMessageFile("/nonexistent/file")
-	if err == nil {
-		t.Error("expected error for nonexistent file")
-	}
+	assert.Error(t, err)
 }
 
 func TestWriteMessageFile(t *testing.T) {
@@ -129,30 +115,21 @@ func TestWriteMessageFile(t *testing.T) {
 
 	content := "feat: add new feature\n\nThis is a detailed description."
 	err := WriteMessageFile(filepath, content)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	// Verify file was written correctly
 	data, err := os.ReadFile(filepath)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	expected := content + "\n" // Should add trailing newline
-	if string(data) != expected {
-		t.Errorf("expected %q, got %q", expected, string(data))
-	}
+	assert.Equal(t, expected, string(data))
 
 	// Verify permissions
 	info, err := os.Stat(filepath)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
+
 	mode := info.Mode()
-	if mode.Perm() != 0o644 {
-		t.Errorf("expected permissions 0644, got %o", mode.Perm())
-	}
+	assert.Equal(t, 0o644, int(mode.Perm()))
 }
 
 func TestWriteMessageFile_AlreadyHasNewline(t *testing.T) {
@@ -161,24 +138,16 @@ func TestWriteMessageFile_AlreadyHasNewline(t *testing.T) {
 
 	content := "feat: add feature\n"
 	err := WriteMessageFile(filepath, content)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	data, err := os.ReadFile(filepath)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
-	if string(data) != content {
-		t.Errorf("expected %q, got %q", content, string(data))
-	}
+	assert.Equal(t, content, string(data))
 }
 
 func TestWriteMessageFile_WriteError(t *testing.T) {
 	// Try to write to a directory (should fail)
 	err := WriteMessageFile("/tmp", "content")
-	if err == nil {
-		t.Error("expected error when writing to directory")
-	}
+	assert.Error(t, err)
 }

@@ -6,7 +6,7 @@ import (
 	"os"
 )
 
-// ExtractArgs parses command line arguments from prepare-commit-msg hook.
+// ExtractArgs parses command line arguments from commit-msg or prepare-commit-msg hook.
 // The hook receives: <commit-msg-file> [<source>] [<SHA1>]
 func ExtractArgs(args []string, dryRun bool) (file string, source string, ref string, err error) {
 	c := len(args)

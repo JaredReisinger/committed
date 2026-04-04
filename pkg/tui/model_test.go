@@ -3,6 +3,7 @@ package tui
 import (
 	"testing"
 
+	"github.com/go-openapi/testify/v2/assert"
 	"github.com/jaredreisinger/committed/internal/config"
 	"github.com/jaredreisinger/committed/pkg/commit"
 )
@@ -11,15 +12,9 @@ func TestNewModel(t *testing.T) {
 	cfg := config.DefaultConfig()
 	m := newModel(cfg, nil)
 
-	if m.config == nil {
-		t.Error("expected config to be set")
-	}
-	if m.focusedField != typeField {
-		t.Error("expected initial focus on type field")
-	}
-	if len(m.config.Types) == 0 {
-		t.Error("expected default types to be loaded")
-	}
+	assert.NotNil(t, m.config)
+	assert.Equal(t, typeField, m.focusedField)
+	assert.NotEmpty(t, m.config.Types)
 }
 
 func TestNewModel_WithExistingMessage(t *testing.T) {
@@ -34,39 +29,27 @@ func TestNewModel_WithExistingMessage(t *testing.T) {
 
 	m := newModel(cfg, existing)
 
-	if m.typeIndex != 0 { // "feat" should be at index 0
-		t.Errorf("expected typeIndex 0 for 'feat', got %d", m.typeIndex)
-	}
-	if m.summary.Value() != "add new feature" {
-		t.Errorf("expected summary to be pre-populated, got %q", m.summary.Value())
-	}
-	if m.details.Value() != "detailed description" {
-		t.Errorf("expected details to be pre-populated, got %q", m.details.Value())
-	}
+	assert.Equal(t, 0, m.typeIndex)
+	assert.Equal(t, "add new feature", m.description.Value())
+	assert.Equal(t, "detailed description", m.body.Value())
 }
 
-func TestValidateSummary(t *testing.T) {
+func TestValidateDescription(t *testing.T) {
 	t.Skip("validation NYI")
 
 	cfg := &config.Config{SubjectMaxLength: 50}
 	m := newModel(cfg, nil)
 
-	// Empty summary should fail
-	m.summary.SetValue("")
-	if err := m.validateSummary(); err == nil {
-		t.Error("expected error for empty summary")
-	}
+	// Empty description should fail
+	m.description.SetValue("")
+	assert.Error(t, m.validateDescription())
 
-	// Valid summary should pass
-	m.summary.SetValue("add new feature")
-	if err := m.validateSummary(); err != nil {
-		t.Errorf("expected no error for valid summary, got %v", err)
-	}
+	// Valid description should pass
+	m.description.SetValue("add new feature")
+	assert.NoError(t, m.validateDescription())
 
-	// Too long summary should fail
-	longSummary := string(make([]byte, 51))
-	m.summary.SetValue(longSummary)
-	if err := m.validateSummary(); err == nil {
-		t.Error("expected error for too long summary")
-	}
+	// Too long description should fail
+	longDescription := string(make([]byte, 51))
+	m.description.SetValue(longDescription)
+	assert.Error(t, m.validateDescription())
 }

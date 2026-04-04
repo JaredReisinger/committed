@@ -3,6 +3,8 @@
 > [!NOTE]
 >
 > This is a record of the Copilot plan for starting this project.
+>
+> Apparently, I picked the wrong hook... we should be using `commit-msg`, not `prepare-commit-msg`.
 
 ## Overview
 

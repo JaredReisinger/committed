@@ -1,6 +1,6 @@
 # committed
 
-A Go-native, bubbletea-powered TUI that integrates as a proper prepare-commit-msg hook for conventional commits.
+A Go-native, bubbletea-powered TUI that integrates as a proper `commit-msg` hook for conventional commits.
 
 ## Installation
 
@@ -12,22 +12,22 @@ go install github.com/jaredreisinger/committed@latest
 
 ### As a Git Hook
 
-Install as a `prepare-commit-msg` hook:
+Install as a `commit-msg` hook:
 
 ```bash
 # In your git repository
-ln -s $(which committed) .git/hooks/prepare-commit-msg
+ln -s $(which committed) .git/hooks/commit-msg
 ```
 
-or create a `.git/hooks/prepare-commit-msg` file that leverages it:
+or create a `.git/hooks/commit-msg` file that leverages it:
 
 ```bash
-cat <<EOF > .git/hooks/prepare-commit-msg
+cat <<EOF > .git/hooks/commit-msg
 #!/usr/bin/sh
 committed $@
 EOF
 
-chmod +x .git/hooks/prepare-commit-msg
+chmod +x .git/hooks/commit-msg
 ```
 
 Now when you run `git commit`, the TUI will appear to help format your commit message.
@@ -37,12 +37,8 @@ Now when you run `git commit`, the TUI will appear to help format your commit me
 You can also run the tool manually; it will load/edit the given file:
 
 ```bash
-committed /path/to/COMMIT_EDITMSG message
+committed /path/to/COMMIT_EDITMSG
 ```
-
-> [!NOTE]
->
-> The `message` argument is important, it's part of the `prepare-commit-msg` API. Perhaps in the future I'll make `committed` a bit more forgiving.
 
 ## Configuration
 

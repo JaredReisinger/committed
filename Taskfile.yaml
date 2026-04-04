@@ -10,7 +10,7 @@ tasks:
     desc: one-time post-clone repo setup
     cmds:
       - go mod tidy
-      - 'echo "NYI: bootstrapping committed as the prepare-commit-msg hook?"'
+      - 'echo "NYI: bootstrapping committed as the commit-msg hook?"'
 
   run:
     desc: run from code

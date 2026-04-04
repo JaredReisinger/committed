@@ -101,7 +101,7 @@ func ParseMessage(raw string) (*Message, error) {
 // parseHeader parses the header line: type(scope): description
 func parseHeader(header string, msg *Message) error {
 	// Match: type(scope): description or type: description
-	re := regexp.MustCompile(`^(\w+)(?:\(([^)]+)\))?:\s*(.+)$`)
+	re := regexp.MustCompile(`^(\w+!?)(?:\(([^)]+)\))?:\s*(.+)$`)
 	matches := re.FindStringSubmatch(header)
 
 	if len(matches) != 4 {
@@ -113,6 +113,11 @@ func parseHeader(header string, msg *Message) error {
 		msg.Scope = matches[2]
 	}
 	msg.Description = matches[3]
+
+	if strings.HasSuffix(msg.Type, "!") {
+		msg.Type = strings.TrimSuffix(msg.Type, "!")
+		msg.Breaking = true
+	}
 
 	return nil
 }
@@ -131,6 +136,9 @@ func isFooterToken(token string) bool {
 			return true
 		}
 	}
+
+	// REVIEW: this seems suspect... the default commit message has trailing
+	// comment lines. And "-" seems very vague.
 
 	// Also accept tokens that look like issue references
 	if strings.Contains(token, "#") || strings.Contains(token, "-") {

@@ -11,7 +11,8 @@ type Message struct {
 	Description string
 	Body        string
 	Footers     []Footer
-	RawMessage  string
+	Breaking    bool
+	RawMessage  string // not sure we need this
 }
 
 // Footer represents a footer in a conventional commit (e.g., "Closes #123").
