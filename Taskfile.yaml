@@ -81,36 +81,44 @@ tasks:
       - go vet ./...
 
   tag-release:
-    desc: sets a tag for the next release if warranted
+    desc: tags the next release if warranted (and on CI)
     vars:
       VER_CUR:
         sh: go tool svu current
       VER_NEXT:
         sh: go tool svu next
-      TAG_IT: '{{ne .VER_NEXT .VER_CUR}}'
     cmds:
-      - echo "svu says {{.VER_CUR}} -> {{.VER_NEXT}}"
+      - cmd: echo "svu says {{.VER_CUR}} -> {{.VER_NEXT}}"
+        silent: true
       - if: '{{ne .VER_NEXT .VER_CUR}}'
-        cmd: git tag -a "v{{.VER_NEXT}}"
-      - if: '{{ne .VER_NEXT .VER_CUR}}'
-        cmd: git push --tags
+        task: tag-release
+        vars:
+          VERSION: '{{.VER_NEXT}}'
       - if: '{{eq .VER_NEXT .VER_CUR}}'
         cmd: echo "no new tag created"
+        silent: true
+
+  # note that tag-release:ci must be run with permissions to write to the
+  # contents of the repo
+  tag-release:ci:
+    internal: true
+    preconditions:
+      - sh: '[ "${CI}" == "true" ]'
+    requires:
+      vars: [ VERSION ]
+    cmds:
+      - git config user.name "github-actions[bot]"
+      - git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      - git tag -a "{{.VERSION}}" -m "release {{.VERSION}}"
+      - git push --tags
 
   release:test:
     desc: test the release process
-    deps:
-      - lint
-      - build
-    vars:
-      VER_CUR:
-        sh: go tool svu current
-      VER_NEXT:
-        sh: go tool svu next
     cmds:
-      - echo "svu says {{.VER_CUR}} -> {{.VER_NEXT}}"
       - go tool goreleaser release --clean --snapshot --skip=publish --skip=sign --skip=sbom {{.CLI_ARGS}}
 
+  # note that release must be run with permissions to write to the
+  # artifacts and releases of the repo
   release:
     desc: actually release the tool
     preconditions:
@@ -118,4 +126,4 @@ tasks:
     cmds:
       # skipping signing for now
       - echo "CI is [${CI}]"
-      - echo go tool goreleaser release --clean --skip=sign
+      - go tool goreleaser release --clean --skip=sign

@@ -39,12 +39,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-go@v6
-        with:
-          go-version-file: go.mod
-
       - uses: go-task/setup-task@v2
 
-      # should this just use `gh`? we could even get the new version from
-      # the other job and avoid fetching, etc.
       - run: task tag-release
