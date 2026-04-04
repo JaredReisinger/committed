@@ -1,5 +1,9 @@
 # Go Conventional Commit TUI Hook Tool — MVP Plan
 
+> [!NOTE]
+>
+> This is a record of the Copilot plan for starting this project.
+
 ## Overview
 
 Build a go-native, bubbletea-powered TUI that integrates as a `prepare-commit-msg` hook. It detects project conventions via config files, collects commit type/summary/details in a 3-field form with smart validation, parses existing messages when present, and writes the formatted message back to the commit file without performing the commit itself.
