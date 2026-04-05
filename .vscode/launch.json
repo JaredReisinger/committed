@@ -21,10 +21,7 @@
       "request": "launch",
       "mode": "debug",
       "program": "${workspaceFolder}",
-      "args": [
-          "MSG",
-          "message"
-      ],
+      "args": ["--dry-run"],
       "console": "integratedTerminal"
     }
   ]

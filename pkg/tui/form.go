@@ -13,6 +13,7 @@ import (
 
 	"github.com/jaredreisinger/committed/internal/config"
 	"github.com/jaredreisinger/committed/pkg/commit"
+	"github.com/jaredreisinger/committed/pkg/teautil"
 )
 
 type field int
@@ -151,72 +152,82 @@ func (m formModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 	handled := false // do we do this, or msg = nil?
 
-	switch msg := msg.(type) {
+	// The message might be a wrapped message intended for a target model, *or*
+	// it might be a generic/unhandled message that go to the focused model. We
+	// de-duplicate that logic.
+	targetModel := m.focusedField
+
+	switch msgT := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.resize(msg.Width, msg.Height)
+		m.resize(msgT.Width, msgT.Height)
 		handled = true
 	case tea.KeyPressMsg:
 		handled = true // assume handled, set back to false in default case
 		switch {
-		case key.Matches(msg, defaultKeyMap.Cancel):
+		case key.Matches(msgT, defaultKeyMap.Cancel):
 			cmds = append(cmds, tea.Interrupt)
 
-		case key.Matches(msg, defaultKeyMap.NextSingle) ||
-			key.Matches(msg, defaultKeyMap.NextMulti):
+		case key.Matches(msgT, defaultKeyMap.NextSingle) ||
+			key.Matches(msgT, defaultKeyMap.NextMulti):
 			m.nextField()
 
-		case key.Matches(msg, defaultKeyMap.Prev):
+		case key.Matches(msgT, defaultKeyMap.Prev):
 			m.prevField()
 
-		case key.Matches(msg, defaultKeyMap.Submit):
+		case key.Matches(msgT, defaultKeyMap.Submit):
 			// TODO: validate?
 			cmds = append(cmds, tea.Quit)
-
-		// case key.Matches(msg, defaultKeyMap.Enter):
-		// 	// enter handling depends on focus...
-		// 	if m.focusedField == bodyField {
-		// 		// // TODO: change to validate as user types?
-		// 		// // Submit the form
-		// 		// if err := m.validateSummary(); err != nil {
-		// 		// 	m.err = err
-		// 		// } else {
-		// 		// 	m.err = nil // clear any error?
-		// 		// 	cmds = append(cmds, tea.Quit)
-		// 		// }
-
-		// 		// delegate enter to details!
-		// 		handled = false
-		// 	} else {
-		// 		m.nextField()
-		// 	}
-
 		default:
 			handled = false
 		}
 
-		// case tea.KeyMsg:
-		// 	switch msg.String() {
+	// case key.Matches(msg, defaultKeyMap.Enter):
+	// 	// enter handling depends on focus...
+	// 	if m.focusedField == bodyField {
+	// 		// // TODO: change to validate as user types?
+	// 		// // Submit the form
+	// 		// if err := m.validateSummary(); err != nil {
+	// 		// 	m.err = err
+	// 		// } else {
+	// 		// 	m.err = nil // clear any error?
+	// 		// 	cmds = append(cmds, tea.Quit)
+	// 		// }
 
-		// 	case "up", "down":
-		// 		if m.focusedField == typeField {
-		// 			if msg.String() == "up" {
-		// 				if m.typeIndex > 0 {
-		// 					m.typeIndex--
-		// 				}
-		// 			} else {
-		// 				if m.typeIndex < len(m.config.Types)-1 {
-		// 					m.typeIndex++
-		// 				}
-		// 			}
-		// 			return m, nil
-		// 		}
-		// 	}
+	// 		// delegate enter to details!
+	// 		handled = false
+	// 	} else {
+	// 		m.nextField()
+	// 	}
+
+	// case tea.KeyMsg:
+	// 	switch msg.String() {
+
+	// 	case "up", "down":
+	// 		if m.focusedField == typeField {
+	// 			if msg.String() == "up" {
+	// 				if m.typeIndex > 0 {
+	// 					m.typeIndex--
+	// 				}
+	// 			} else {
+	// 				if m.typeIndex < len(m.config.Types)-1 {
+	// 					m.typeIndex++
+	// 				}
+	// 			}
+	// 			return m, nil
+	// 		}
+	// 	}
+
+	case teautil.WrappedMsg[int]:
+		// forward the message to the appropriate model...
+		targetModel = field(msgT.Id)
+		msg = msgT.Msg
+		// *don't* set handled!
 	}
 
 	// delegate other messages to the field/model with focus...
 	if !handled {
 		var cmd tea.Cmd
-		switch m.focusedField {
+		switch targetModel {
 		case typeField:
 			m.typ, cmd = m.typ.Update(msg)
 		case descriptionField:
@@ -230,7 +241,7 @@ func (m formModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
-		cmds = append(cmds, cmd)
+		cmds = append(cmds, teautil.Wrap(cmd, int(targetModel)))
 	}
 
 	// // Clear any previous validation errors when user types

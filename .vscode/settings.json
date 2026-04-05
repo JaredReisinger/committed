@@ -15,11 +15,13 @@
         "GOPATH",
         "goreleaser",
         "infile",
+        "keymap",
         "leodido",
         "lipgloss",
         "sandboxing",
         "sboms",
         "sigstore",
+        "teautil",
         "textinput"
     ]
 }
