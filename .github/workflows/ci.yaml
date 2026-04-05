@@ -24,6 +24,10 @@ jobs:
 
       - run: task test
 
+      - uses: codecov/codecov-action@v6
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+
       - run: task build
 
       - run: task release:test
