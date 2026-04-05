@@ -40,12 +40,23 @@ func (r Router[I, T]) Len() int {
 }
 
 // should this return an error instead of ok? There's only one error condition.
+// Should the returned model be a pointer or a value? We really should support
+// value-based patterns.
 func (r Router[I, T]) Index(i I) (*T, bool) {
 	actualIndex := i - r.firstId
 	if actualIndex < 0 || actualIndex >= I(len(r.models)) {
 		return nil, false
 	}
 	return &r.models[actualIndex], true
+}
+
+func (r Router[I, T]) MustIndex(i I) *T {
+	m, ok := r.Index(i)
+	if !ok {
+		panic("index invalid")
+	}
+
+	return m
 }
 
 // Update handles routing messages to the appropriate child model. If the

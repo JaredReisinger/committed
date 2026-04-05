@@ -31,10 +31,11 @@ type formModel struct {
 	config       *config.Config
 	existingMsg  *commit.Message // just for init, don't persist
 	focusedField field
-	typ          textarea.Model
+	models       teautil.Router[field, textareaShim]
+	// typ          textarea.Model
 	//scope
-	description   textarea.Model
-	body          textarea.Model
+	// description   textarea.Model
+	// body          textarea.Model
 	bodyMaxHeight int
 	help          help.Model
 	typeIndex     int // for navigating type enum
@@ -49,6 +50,22 @@ func stdText(fullBorder bool) textarea.Model {
 	t.ShowLineNumbers = false
 	t.KeyMap.InsertNewline.SetEnabled(false)
 	return t
+}
+
+// *sigh* ... textarea does not actually implement tea.Model correctly!
+type textareaShim struct {
+	textarea.Model
+}
+
+func (m textareaShim) Init() tea.Cmd { return nil }
+
+func (m textareaShim) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	inner, cmd := m.Model.Update(msg)
+	return textareaShim{inner}, cmd
+}
+
+func (m textareaShim) View() tea.View {
+	return tea.NewView(m.Model.View())
 }
 
 // newModel creates a new TUI model with the given configuration and optional
@@ -82,11 +99,12 @@ func newModel(cfg *config.Config, existingMsg *commit.Message) formModel {
 		config:       cfg,
 		existingMsg:  existingMsg,
 		focusedField: typeField,
-		typ:          typ,
-		description:  description,
-		body:         body,
-		help:         help,
-		typeIndex:    0,
+		// typ:          typ,
+		// description:  description,
+		// body:         body,
+		models:    teautil.NewRouter(typeField, textareaShim{typ}, textareaShim{description}, textareaShim{body}),
+		help:      help,
+		typeIndex: 0,
 	}
 
 	// Pre-populate fields if we have an existing message
@@ -117,27 +135,31 @@ func (m *formModel) populateFromExisting() {
 		return
 	}
 
+	typ := m.models.MustIndex(typeField)
+	desc := m.models.MustIndex(descriptionField)
+	body := m.models.MustIndex(bodyField)
+
 	// Set type
 	if m.existingMsg.Type != "" {
 		// Find the type in our config enum
 		for i, t := range m.config.Types {
 			if t == m.existingMsg.Type {
 				m.typeIndex = i
-				m.typ.SetValue(t)
-				m.typ.MoveToBegin()
+				typ.SetValue(t)
+				typ.MoveToBegin()
 				break
 			}
 		}
 	}
 
 	if m.existingMsg.Description != "" {
-		m.description.SetValue(m.existingMsg.Description)
-		m.description.MoveToBegin()
+		desc.SetValue(m.existingMsg.Description)
+		desc.MoveToBegin()
 	}
 
 	if m.existingMsg.Body != "" {
-		m.body.SetValue(m.existingMsg.Body)
-		m.body.MoveToBegin()
+		body.SetValue(m.existingMsg.Body)
+		body.MoveToBegin()
 	}
 }
 
@@ -227,21 +249,17 @@ func (m formModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// delegate other messages to the field/model with focus...
 	if !handled {
 		var cmd tea.Cmd
-		switch targetModel {
-		case typeField:
-			m.typ, cmd = m.typ.Update(msg)
-		case descriptionField:
-			m.description, cmd = m.description.Update(msg)
-		case bodyField:
-			m.body, cmd = m.body.Update(msg)
-			if m.body.DynamicHeight && m.body.Height() >= m.bodyMaxHeight {
-				m.body.DynamicHeight = false
-				m.body.MaxHeight = 0
-				m.body.SetHeight(m.bodyMaxHeight)
+		m.models, cmd = m.models.Update(msg, targetModel)
+		cmds = append(cmds, cmd)
+
+		if targetModel == bodyField {
+			body := m.models.MustIndex(bodyField)
+			if body.DynamicHeight && body.Height() >= m.bodyMaxHeight {
+				body.DynamicHeight = false
+				body.MaxHeight = 0
+				body.SetHeight(m.bodyMaxHeight)
 			}
 		}
-
-		cmds = append(cmds, teautil.Wrap(cmd, int(targetModel)))
 	}
 
 	// // Clear any previous validation errors when user types
@@ -260,27 +278,31 @@ func (m *formModel) resize(width int, height int) {
 	// width. At least that what appears to happen. The code looks like it tries
 	// to include margin+border+padding+content. 🤷🏼‍♂️
 
-	xx, yy := m.typ.Styles().Focused.Base.GetFrameSize()
+	typ := m.models.MustIndex(typeField)
+	desc := m.models.MustIndex(descriptionField)
+	body := m.models.MustIndex(bodyField)
+
+	xx, yy := typ.Styles().Focused.Base.GetFrameSize()
 	cfg := m.config
 
 	maxTyp := maxTypeLength(cfg)
-	m.typ.CharLimit = maxTyp
-	m.typ.SetWidth(maxTyp + xx + 1) // +1 for cursor
+	typ.CharLimit = maxTyp
+	typ.SetWidth(maxTyp + xx + 1) // +1 for cursor
 
 	subLimit := min(cfg.SubjectMaxLength, cfg.HeaderMaxLength-maxTyp)
-	m.description.CharLimit = subLimit
-	m.description.SetWidth(min(subLimit+xx+1, width-m.typ.Width())) // +1 for cursor
+	desc.CharLimit = subLimit
+	desc.SetWidth(min(subLimit+xx+1, width-typ.Width())) // +1 for cursor
 
-	m.body.SetWidth(min(cfg.BodyMaxLineLength+xx, width))
+	body.SetWidth(min(cfg.BodyMaxLineLength+xx, width))
 	helpHeight := 8
 	logHeight := 1
-	m.bodyMaxHeight = height - m.typ.Height() - yy - yy - helpHeight - logHeight - 1
-	m.body.MaxHeight = m.bodyMaxHeight
+	m.bodyMaxHeight = height - typ.Height() - yy - yy - helpHeight - logHeight - 1
+	body.MaxHeight = m.bodyMaxHeight
 
-	if m.body.DynamicHeight && m.body.Height() >= m.bodyMaxHeight {
-		m.body.DynamicHeight = false
-		m.body.MaxHeight = 0
-		m.body.SetHeight(m.bodyMaxHeight)
+	if body.DynamicHeight && body.Height() >= m.bodyMaxHeight {
+		body.DynamicHeight = false
+		body.MaxHeight = 0
+		body.SetHeight(m.bodyMaxHeight)
 	}
 
 	// it would be nice to switch back to dynamic if the content shrinks, but
@@ -291,9 +313,13 @@ func (m *formModel) resize(width int, height int) {
 
 // updateFocus updates which field is currently focused.
 func (m *formModel) updateFocus() {
-	m.typ.Blur()
-	m.description.Blur()
-	m.body.Blur()
+	typ := m.models.MustIndex(typeField)
+	desc := m.models.MustIndex(descriptionField)
+	body := m.models.MustIndex(bodyField)
+
+	typ.Blur()
+	desc.Blur()
+	body.Blur()
 
 	// NOTE: we *should not* have to update the insert-newline keybinding. As a
 	// value struct, each textarea should have its own copy. And yet... they
@@ -301,18 +327,18 @@ func (m *formModel) updateFocus() {
 
 	switch m.focusedField {
 	case typeField:
-		m.typ.Focus()
-		m.typ.KeyMap.InsertNewline.SetEnabled(false)
+		typ.Focus()
+		typ.KeyMap.InsertNewline.SetEnabled(false)
 		defaultKeyMap.NextSingle.SetEnabled(true)
 		defaultKeyMap.NextMulti.SetEnabled(false)
 	case descriptionField:
-		m.description.Focus() // returned tea.Cmd ignored!
-		m.description.KeyMap.InsertNewline.SetEnabled(false)
+		desc.Focus() // returned tea.Cmd ignored!
+		desc.KeyMap.InsertNewline.SetEnabled(false)
 		defaultKeyMap.NextSingle.SetEnabled(true)
 		defaultKeyMap.NextMulti.SetEnabled(false)
 	case bodyField:
-		m.body.Focus() // returned tea.Cmd ignored!
-		m.body.KeyMap.InsertNewline.SetEnabled(true)
+		body.Focus() // returned tea.Cmd ignored!
+		body.KeyMap.InsertNewline.SetEnabled(true)
 		defaultKeyMap.NextSingle.SetEnabled(false)
 		defaultKeyMap.NextMulti.SetEnabled(true)
 	}
@@ -332,7 +358,7 @@ func (m *formModel) prevField() {
 
 // validateDescription checks if the description field meets requirements.
 func (m *formModel) validateDescription() error {
-	// description := strings.TrimSpace(m.description.Value())
+	// description := strings.TrimSpace(desc.Value())
 	// if description == "" {
 	// 	return fmt.Errorf("description is required")
 	// }
@@ -344,6 +370,9 @@ func (m *formModel) validateDescription() error {
 
 // View renders the TUI.
 func (m formModel) View() tea.View {
+	typ := m.models.MustIndex(typeField)
+	desc := m.models.MustIndex(descriptionField)
+	body := m.models.MustIndex(bodyField)
 
 	// TODO: use lipgloss.NewLayer() and compositor.Compose() to handle z-depth
 	// rendering
@@ -353,11 +382,11 @@ func (m formModel) View() tea.View {
 
 	switch m.focusedField {
 	case typeField:
-		taKeyMap = m.typ.KeyMap
+		taKeyMap = typ.KeyMap
 	case descriptionField:
-		taKeyMap = m.description.KeyMap
+		taKeyMap = desc.KeyMap
 	case bodyField:
-		taKeyMap = m.body.KeyMap
+		taKeyMap = body.KeyMap
 	}
 
 	// ... we shouldn't recalc the keymap every view...
@@ -371,10 +400,10 @@ func (m formModel) View() tea.View {
 		// " 1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890",
 		lipgloss.JoinHorizontal(
 			lipgloss.Top,
-			m.typ.View(),
-			m.description.View(),
+			typ.View().Content,
+			desc.View().Content,
 		),
-		m.body.View(),
+		body.View().Content,
 		m.help.View(keyMap), // &defaultKeyMap),
 
 		// // debug config info
@@ -400,11 +429,14 @@ func (m formModel) Result() (*commit.Message, error) {
 	// if !m.done {
 	// 	return nil, fmt.Errorf("form not completed")
 	// }
+	typ := m.models.MustIndex(typeField)
+	desc := m.models.MustIndex(descriptionField)
+	body := m.models.MustIndex(bodyField)
 
 	msg := &commit.Message{
-		Type:        strings.TrimSpace(m.typ.Value()),
-		Description: strings.TrimSpace(m.description.Value()),
-		Body:        strings.TrimSpace(m.body.Value()),
+		Type:        strings.TrimSpace(typ.Value()),
+		Description: strings.TrimSpace(desc.Value()),
+		Body:        strings.TrimSpace(body.Value()),
 	}
 
 	// if len(m.config.Types) > 0 && m.typeIndex >= 0 && m.typeIndex < len(m.config.Types) {

@@ -29,9 +29,12 @@ func TestNewModel_WithExistingMessage(t *testing.T) {
 
 	m := newModel(cfg, existing)
 
+	desc := m.models.MustIndex(descriptionField)
+	body := m.models.MustIndex(bodyField)
+
 	assert.Equal(t, 0, m.typeIndex)
-	assert.Equal(t, "add new feature", m.description.Value())
-	assert.Equal(t, "detailed description", m.body.Value())
+	assert.Equal(t, "add new feature", desc.Value())
+	assert.Equal(t, "detailed description", body.Value())
 }
 
 func TestValidateDescription(t *testing.T) {
@@ -40,16 +43,18 @@ func TestValidateDescription(t *testing.T) {
 	cfg := &config.Config{SubjectMaxLength: 50}
 	m := newModel(cfg, nil)
 
+	desc := m.models.MustIndex(descriptionField)
+
 	// Empty description should fail
-	m.description.SetValue("")
+	desc.SetValue("")
 	assert.Error(t, m.validateDescription())
 
 	// Valid description should pass
-	m.description.SetValue("add new feature")
+	desc.SetValue("add new feature")
 	assert.NoError(t, m.validateDescription())
 
 	// Too long description should fail
 	longDescription := string(make([]byte, 51))
-	m.description.SetValue(longDescription)
+	desc.SetValue(longDescription)
 	assert.Error(t, m.validateDescription())
 }
