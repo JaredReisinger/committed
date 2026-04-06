@@ -6,8 +6,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
-// WrappedMsg represents a wrapper around the Msg returned from a Cmd. See
-// [Wrap] for further details.
+// WrappedMsg represents a wrapper around the [tea.Msg] returned from a
+// [tea.Cmd]. See [Wrap] for further details.
 type WrappedMsg[K comparable] struct {
 	Key K
 	Msg tea.Msg
@@ -17,7 +17,8 @@ type WrappedMsg[K comparable] struct {
 // [tea.Cmd], regardless of whether it's a direct command or a collective one
 // like [tea.Batch] or [tea.Sequence].  This function is used by [Router] to
 // automatically wrap commands returned from child models in [Router.Update] and
-// [Router.UpdateAll].
+// [Router.UpdateAll], and then direct the resulting messages back to the child
+// model that sent the command.
 func Wrap[K comparable](cmd tea.Cmd, key K) tea.Cmd {
 	if cmd == nil {
 		return cmd

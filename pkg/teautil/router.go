@@ -15,15 +15,15 @@ import (
 //
 // One tricky aspect is that parent models often care about the concrete type of
 // their child models, but updates and message routing all follow the same
-// pattern, *plus* a parent needs to re-assign child models from the model
-// return value of Update().  The opinionated solution here is to strongly
-// recommend using concrete [tea.Model]-implementing types, so that the parent
-// does not need to perform any type-casting to use them. The corollary to this
-// is that with Router thus a fully idempotent/immutable object, the caller must
-// also be careful to perform mutating operations in "the correct way": call
-// [Router.Set] for any change to a child model, save the returned [Router] into
-// itself, *and return itself from that function so that callers can also
-// acquire the new immutable object*.
+// pattern, plus a parent needs to re-assign child models from the model return
+// value of Update().  The opinionated solution here is to strongly recommend
+// using concrete [tea.Model]-implementing types, so that the parent does not
+// need to perform any type-casting to use them. The corollary to this is that
+// since Router is a fully idempotent/immutable object, the caller must also be
+// careful to perform mutating operations in “the correct way”: call
+// [Router.Set] for any change to a child model, save the returned Router into
+// itself, and return itself from that function so that callers can also acquire
+// the new immutable object.
 type Router[K comparable, M tea.Model] struct {
 	models          map[K]M
 	useBroadcastKey bool
@@ -31,6 +31,9 @@ type Router[K comparable, M tea.Model] struct {
 }
 
 // NewRouter creates a new model message router.
+//
+// The intention is that the M model type is a concrete specific type, not an
+// interface like [tea.Model], to ensure immutable data-value semantics.
 func NewRouter[K comparable, M tea.Model](models map[K]M, options ...RouterOption[K, M]) Router[K, M] {
 	r := Router[K, M]{
 		models: maps.Clone(models),
@@ -83,7 +86,8 @@ func (r Router[K, M]) Values() iter.Seq[M] {
 	return maps.Values(r.models)
 }
 
-// Get returns the model with the given key, or (nil,false) if the key does not exist.
+// Get returns the model with the given key, or (nil,false) if the key does not
+// exist.
 func (r Router[K, M]) Get(key K) (M, bool) {
 	m, ok := r.models[key]
 	return m, ok
@@ -120,23 +124,21 @@ func (r Router[K, M]) Set(key K, model M) Router[K, M] {
 // support object immutability, a new [Router] object is returned.
 func (r Router[K, M]) SetMap(modelMap map[K]M) Router[K, M] {
 	rr := r.clone()
-	for key, model := range modelMap {
-		rr.models[key] = model
-	}
+	maps.Copy(rr.models, modelMap)
 	return rr
 }
 
 // Update handles routing messages to the appropriate child model. If the
-// message is a [WrappedMsg], it is unwrapped and routed to that specific child
-// (if if the broadcast key is passed as the key). Otherwise, if the key is the
-// router's broadcast key, the message is sent to all child models. If the key
-// is not the broadcast key, the message is either sent to the child model with
-// the matching key or silently dropped if no such child model exists.
+// message is a [WrappedMsg], it is unwrapped and routed only to that specific
+// child regardless of the value passed for defaultKey. Otherwise, if the key is
+// the router’s broadcast key, the message is sent to all child models. If the
+// key is not the broadcast key, the message is either sent to the child model
+// with the matching key or silently dropped if no such child model exists.
 //
 // Note that any [tea.Cmd] commands returned from individual child models are
-// automatically wrapped to return a [WrappedMsg] so that it will be routed
-// directly back to that child.
-func (r Router[K, M]) Update(msg tea.Msg, key K) (Router[K, M], tea.Cmd) {
+// automatically wrapped via [Wrap] so that any resulting [tea.Msg] will be
+// routed directly back to that child.
+func (r Router[K, M]) Update(msg tea.Msg, defaultKey K) (Router[K, M], tea.Cmd) {
 	// Should we add a fallback in case someone wraps using an int instead of a
 	// known type?  Or at least an "if !ok but .(WrappedMsg[int])?"
 	var keys iter.Seq[K]
@@ -144,21 +146,21 @@ func (r Router[K, M]) Update(msg tea.Msg, key K) (Router[K, M], tea.Cmd) {
 	if wrappedMsg, ok := msg.(WrappedMsg[K]); ok {
 		keys = singleSeq(wrappedMsg.Key)
 		msg = wrappedMsg.Msg
-	} else if r.useBroadcastKey && key == r.broadcastKey {
+	} else if r.useBroadcastKey && defaultKey == r.broadcastKey {
 		keys = r.Keys()
 	} else {
-		keys = singleSeq(key)
+		keys = singleSeq(defaultKey)
 	}
 
 	return r.update(msg, keys)
 }
 
-// UpdateAll  routes messages to the every child model. The message is *not*
+// UpdateAll routes messages to the every child model. The message is not
 // checked to see if it is a [WrappedMsg], it is sent as-is.
 //
 // Note that any [tea.Cmd] commands returned from individual child models are
-// automatically wrapped to return a [WrappedMsg] so that it will be routed
-// directly back to that child.
+// automatically wrapped via [Wrap] so that any resulting [tea.Msg] will be
+// routed directly back to that child.
 func (r Router[K, M]) UpdateAll(msg tea.Msg) (Router[K, M], tea.Cmd) {
 	return r.update(msg, r.Keys())
 }
