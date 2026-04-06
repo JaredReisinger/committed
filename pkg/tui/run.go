@@ -19,7 +19,7 @@ func Run(cfg *config.Config, existingMsg *commit.Message) (*commit.Message, erro
 		return nil, err
 	}
 
-	tuiModel, ok := finalModel.(formModel)
+	tuiModel, ok := finalModel.(form)
 	if !ok {
 		return nil, errors.WithMessage(err, "unexpected model type")
 	}

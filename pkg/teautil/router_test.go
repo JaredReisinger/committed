@@ -81,17 +81,13 @@ func TestRouterSingleUpdate(t *testing.T) {
 		2: {},
 	})
 
-	child1 := r.MustGet(1)
-	child2 := r.MustGet(2)
-	assert.Equal(t, 0, child1.counter)
-	assert.Equal(t, 0, child2.counter)
+	assert.Equal(t, 0, r.MustGet(1).counter)
+	assert.Equal(t, 0, r.MustGet(2).counter)
 
 	rr, cmd := r.Update(bogusMsg{}, 1)
 
-	child1 = rr.MustGet(1)
-	child2 = rr.MustGet(2)
-	assert.Equal(t, 1, child1.counter)
-	assert.Equal(t, 0, child2.counter)
+	assert.Equal(t, 1, rr.MustGet(1).counter)
+	assert.Equal(t, 0, rr.MustGet(2).counter)
 
 	wrappedMsg, ok := (cmd()).(WrappedMsg[int])
 	assert.True(t, ok)
@@ -104,17 +100,13 @@ func TestRouterRoutedUpdate(t *testing.T) {
 		2: {},
 	})
 
-	child1 := r.MustGet(1)
-	child2 := r.MustGet(2)
-	assert.Equal(t, 0, child1.counter)
-	assert.Equal(t, 0, child2.counter)
+	assert.Equal(t, 0, r.MustGet(1).counter)
+	assert.Equal(t, 0, r.MustGet(2).counter)
 
 	rr, cmd := r.Update(WrappedMsg[int]{2, bogusMsg{}}, 1)
 
-	child1 = rr.MustGet(1)
-	child2 = rr.MustGet(2)
-	assert.Equal(t, 0, child1.counter)
-	assert.Equal(t, 1, child2.counter)
+	assert.Equal(t, 0, rr.MustGet(1).counter)
+	assert.Equal(t, 1, rr.MustGet(2).counter)
 
 	wrappedMsg, ok := (cmd()).(WrappedMsg[int])
 	assert.True(t, ok)
@@ -127,17 +119,13 @@ func TestRouterUpdateBroadcast(t *testing.T) {
 		2: {},
 	}, WithBroadcastKey[int, dummyModel](-1))
 
-	child1 := r.MustGet(1)
-	child2 := r.MustGet(2)
-	assert.Equal(t, 0, child1.counter)
-	assert.Equal(t, 0, child2.counter)
+	assert.Equal(t, 0, r.MustGet(1).counter)
+	assert.Equal(t, 0, r.MustGet(2).counter)
 
 	rr, cmd := r.Update(bogusMsg{}, -1)
 
-	child1 = rr.MustGet(1)
-	child2 = rr.MustGet(2)
-	assert.Equal(t, 1, child1.counter)
-	assert.Equal(t, 1, child2.counter)
+	assert.Equal(t, 1, rr.MustGet(1).counter)
+	assert.Equal(t, 1, rr.MustGet(2).counter)
 
 	_, ok := (cmd()).(tea.BatchMsg)
 	assert.True(t, ok)
@@ -149,20 +137,35 @@ func TestRouterUpdateAll(t *testing.T) {
 		2: {},
 	})
 
-	child1 := r.MustGet(1)
-	child2 := r.MustGet(2)
-	assert.Equal(t, 0, child1.counter)
-	assert.Equal(t, 0, child2.counter)
+	assert.Equal(t, 0, r.MustGet(1).counter)
+	assert.Equal(t, 0, r.MustGet(2).counter)
 
 	rr, cmd := r.UpdateAll(bogusMsg{})
 
-	child1 = rr.MustGet(1)
-	child2 = rr.MustGet(2)
-	assert.Equal(t, 1, child1.counter)
-	assert.Equal(t, 1, child2.counter)
+	assert.Equal(t, 1, rr.MustGet(1).counter)
+	assert.Equal(t, 1, rr.MustGet(2).counter)
 
 	_, ok := (cmd()).(tea.BatchMsg)
 	assert.True(t, ok)
+}
+
+func TestRouterSetMap(t *testing.T) {
+	r := NewRouter(map[int]dummyModel{
+		1: {1},
+		2: {2},
+	})
+
+	assert.Equal(t, 1, r.MustGet(1).counter)
+	assert.Equal(t, 2, r.MustGet(2).counter)
+
+	rr := r.SetMap(map[int]dummyModel{
+		1: {10},
+		3: {3},
+	})
+
+	assert.Equal(t, 10, rr.MustGet(1).counter)
+	assert.Equal(t, 2, rr.MustGet(2).counter)
+	assert.Equal(t, 3, rr.MustGet(3).counter)
 }
 
 type dummyModel struct {
@@ -182,17 +185,50 @@ func (m dummyModel) View() tea.View {
 	return tea.NewView("")
 }
 
-// examples?
+// examples...
+
+func ExampleRouter_multiple_routers() {
+	// Let's say you have two child model types and the keys represent a
+	// focus/tab-order. You might have something like:
+
+	router1 := NewRouter(map[int]ChildModel{
+		1: { /* ... ChildModel object ... */ },
+		3: { /* ... ChildModel object ... */ },
+		4: { /* ... ChildModel object ... */ },
+	})
+
+	router2 := NewRouter(map[int]ChildModel2{
+		2: { /* ... ChildModel2 object ... */ },
+		5: { /* ... ChildModel2 object ... */ },
+	})
+
+	// In your Update() handler, here's how you'd handle a message for a
+	// specific child; you *don't* have to know which router the child key is
+	// in.
+
+	var cmds []tea.Cmd // all commands to be returned from this handler
+	var msg tea.Msg
+	childKey := 2
+
+	var cmd tea.Cmd
+
+	router1, cmd = router1.Update(msg, childKey)
+	cmds = append(cmds, cmd)
+	router2, cmd = router2.Update(msg, childKey)
+	cmds = append(cmds, cmd)
+
+}
 
 func ExampleRouter_UpdateAll() {
-	// Inside your parent model's Update() implementation
-	p := parentModel
+	p := parentModel // assume `p` is the receiver
+	// ParentModel_Update is standing in for `func (p ParentModel) Update(tea.Msg) ...`
 	ParentModel_Update := func(msg tea.Msg) (tea.Model, tea.Cmd) {
-		var cmds []tea.Cmd // all commands returned from the parent's Update
-		var cmd tea.Cmd
+
+		var cmds []tea.Cmd // all commands to be returned from this handler
 
 		// . . . other message handling
 
+		var cmd tea.Cmd
 		p.router, cmd = p.router.UpdateAll(msg)
 		cmds = append(cmds, cmd)
 
@@ -217,7 +253,9 @@ type ParentModel struct {
 	M
 	router Router[int, ChildModel]
 }
+
 type ChildModel struct{ M }
+type ChildModel2 struct{ M }
 
 func NewParentModel() tea.Model {
 	return ParentModel{

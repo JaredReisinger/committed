@@ -23,6 +23,9 @@
         "sboms",
         "sigstore",
         "teautil",
-        "textinput"
-    ]
+        "textareas",
+        "textinput",
+        "textinputs"
+    ],
+    "coverage-gutters.coverageReportFileName": ".coverage/coverage.html",
 }

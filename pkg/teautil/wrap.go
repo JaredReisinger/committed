@@ -13,10 +13,10 @@ type WrappedMsg[K comparable] struct {
 	Msg tea.Msg
 }
 
-// Wrap allows a parent component to accurately wrap the results of any Cmd,
-// regardless of whether it's a direct Cmd or a collective one like [tea.Batch]
-// or [tea.Sequence].  This function is used by [Router] to automatically wrap
-// commands returned from child models in [Router.Update] and
+// Wrap allows a parent component to accurately wrap the results of any
+// [tea.Cmd], regardless of whether it's a direct command or a collective one
+// like [tea.Batch] or [tea.Sequence].  This function is used by [Router] to
+// automatically wrap commands returned from child models in [Router.Update] and
 // [Router.UpdateAll].
 func Wrap[K comparable](cmd tea.Cmd, key K) tea.Cmd {
 	if cmd == nil {

@@ -29,8 +29,8 @@ func TestNewModel_WithExistingMessage(t *testing.T) {
 
 	m := newModel(cfg, existing)
 
-	desc := m.models.MustGet(descriptionField)
-	body := m.models.MustGet(bodyField)
+	desc := m.texts.MustGet(descriptionField)
+	body := m.texts.MustGet(bodyField)
 
 	assert.Equal(t, 0, m.typeIndex)
 	assert.Equal(t, "add new feature", desc.Value())
@@ -43,7 +43,7 @@ func TestValidateDescription(t *testing.T) {
 	cfg := &config.Config{SubjectMaxLength: 50}
 	m := newModel(cfg, nil)
 
-	desc := m.models.MustGet(descriptionField)
+	desc := m.texts.MustGet(descriptionField)
 
 	// Empty description should fail
 	desc.SetValue("")

@@ -116,6 +116,16 @@ func (r Router[K, M]) Set(key K, model M) Router[K, M] {
 	return rr
 }
 
+// SetMap sets several new or changed child models into the router. Note that to
+// support object immutability, a new [Router] object is returned.
+func (r Router[K, M]) SetMap(modelMap map[K]M) Router[K, M] {
+	rr := r.clone()
+	for key, model := range modelMap {
+		rr.models[key] = model
+	}
+	return rr
+}
+
 // Update handles routing messages to the appropriate child model. If the
 // message is a [WrappedMsg], it is unwrapped and routed to that specific child
 // (if if the broadcast key is passed as the key). Otherwise, if the key is the

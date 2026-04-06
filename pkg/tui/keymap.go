@@ -1,9 +1,10 @@
 package tui
 
 import (
+	"slices"
+
 	"charm.land/bubbles/v2/help"
 	"charm.land/bubbles/v2/key"
-	"charm.land/bubbles/v2/textarea"
 )
 
 type keyMap struct {
@@ -61,78 +62,28 @@ func (k *keyMap) FullHelp() [][]key.Binding {
 	return nil
 }
 
-func inTextareaKeyMap(taKeyMap textarea.KeyMap) help.KeyMap {
+func buildHelpKeys(textKeyBindings []key.Binding) help.KeyMap {
 	// combine maps
 	h := &helpMap{}
+
 	h.short = []key.Binding{
 		defaultKeyMap.NextSingle,
 		defaultKeyMap.NextMulti,
 		defaultKeyMap.Prev,
 		defaultKeyMap.Cancel,
-		taKeyMap.InsertNewline,
+	}
+	h.short = append(h.short, textKeyBindings...)
 
-		// taKeyMap.CharacterBackward,
-		// taKeyMap.CharacterForward,
-		taKeyMap.DeleteAfterCursor,
-		taKeyMap.DeleteBeforeCursor,
-		// taKeyMap.DeleteCharacterBackward,
-		// taKeyMap.DeleteCharacterForward,
-		taKeyMap.DeleteWordBackward,
-		taKeyMap.DeleteWordForward,
-		// taKeyMap.LineEnd,
-		// taKeyMap.LineNext,
-		// taKeyMap.LinePrevious,
-		// taKeyMap.LineStart,
-		// taKeyMap.PageUp,
-		// taKeyMap.PageDown,
-		taKeyMap.Paste,
-		taKeyMap.WordBackward,
-		taKeyMap.WordForward,
-		taKeyMap.InputBegin,
-		taKeyMap.InputEnd,
-		taKeyMap.UppercaseWordForward,
-		taKeyMap.LowercaseWordForward,
-		taKeyMap.CapitalizeWordForward,
-		taKeyMap.TransposeCharacterBackward,
+	// For the long list, it's 6 or 7 per group, and we can tell based on the
+	// full length...(4+7) or (4+14), 11 or 18, so we pick 15 as the threshold
+	chunkSize := 6
+	if len(h.short) >= 15 {
+		chunkSize = 7
 	}
 
-	// for full help we need "columns of bindings"
-	h.full = append(h.full,
-		[]key.Binding{
-			defaultKeyMap.NextSingle,
-			defaultKeyMap.NextMulti,
-			defaultKeyMap.Prev,
-			defaultKeyMap.Cancel,
-			taKeyMap.InsertNewline,
-			// taKeyMap.CharacterBackward,
-			// taKeyMap.CharacterForward,
-			taKeyMap.DeleteAfterCursor,
-			taKeyMap.DeleteBeforeCursor,
-		},
-		[]key.Binding{
-			// taKeyMap.DeleteCharacterBackward,
-			// taKeyMap.DeleteCharacterForward,
-			taKeyMap.DeleteWordBackward,
-			taKeyMap.DeleteWordForward,
-			// taKeyMap.LineEnd,
-			// taKeyMap.LineNext,
-			// taKeyMap.LinePrevious,
-			// taKeyMap.LineStart,
-			// taKeyMap.PageUp,
-			// taKeyMap.PageDown,
-			taKeyMap.Paste,
-			taKeyMap.WordBackward,
-			taKeyMap.WordForward,
-			taKeyMap.InputBegin,
-			taKeyMap.InputEnd,
-		},
-		[]key.Binding{
-			taKeyMap.UppercaseWordForward,
-			taKeyMap.LowercaseWordForward,
-			taKeyMap.CapitalizeWordForward,
-			taKeyMap.TransposeCharacterBackward,
-		},
-	)
+	for chunk := range slices.Chunk(h.short, chunkSize) {
+		h.full = append(h.full, chunk)
+	}
 
 	return h
 }
