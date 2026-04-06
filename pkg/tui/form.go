@@ -28,13 +28,13 @@ const (
 	maxField
 )
 
-// form represents the TUI state for conventional commit composition.
+// mainForm represents the TUI state for conventional commit composition.
 //
 // It includes both local state and also the child models (which are, in a
 // sense, also a kind of local state.)   The original AI-created class was an
 // absolute mess, with no sense of immutability at all.  The addition of
 // [teautil.Router] is helping a ton, however.
-type form struct {
+type mainForm struct {
 	config       *config.Config
 	existingMsg  *commit.Message // just for init, don't persist
 	focusedField field
@@ -50,7 +50,7 @@ type form struct {
 
 // newModel creates a new TUI model with the given configuration and optional
 // existing message.
-func newModel(cfg *config.Config, existingMsg *commit.Message) form {
+func newModel(cfg *config.Config, existingMsg *commit.Message) mainForm {
 	// get existing message content...
 	var initialType string
 	var initialScope string
@@ -69,7 +69,7 @@ func newModel(cfg *config.Config, existingMsg *commit.Message) form {
 	help.ShowAll = true
 	help.SetWidth(80)
 
-	m := form{
+	m := mainForm{
 		config:       cfg,
 		existingMsg:  existingMsg,
 		focusedField: typeField,
@@ -147,7 +147,7 @@ func maxTypeLength(cfg *config.Config) int {
 // }
 
 // Init initializes the bubbletea program.
-func (m form) Init() tea.Cmd {
+func (form mainForm) Init() tea.Cmd {
 	// should other processing happen here?
 	// return textinput.Blink
 	// Set initial focus
@@ -165,7 +165,7 @@ func setFocusCmd(f field) tea.Cmd {
 }
 
 // Update handles user input and updates the model.
-func (m form) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (form mainForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd // aggregated commands
 	var cmd tea.Cmd
 	handled := false // do we do this, or msg = nil?
@@ -177,10 +177,10 @@ func (m form) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msgT := msg.(type) {
 	case tea.WindowSizeMsg:
-		m = m.resize(msgT.Width, msgT.Height)
+		form = form.resize(msgT.Width, msgT.Height)
 		handled = true
 	case setFocusMsg:
-		m, cmd = m.setFocus(msgT.field)
+		form, cmd = form.setFocus(msgT.field)
 		cmds = append(cmds, cmd)
 	case tea.KeyPressMsg:
 		handled = true // assume handled, set back to false in default case
@@ -190,10 +190,10 @@ func (m form) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case key.Matches(msgT, defaultKeyMap.NextSingle) ||
 			key.Matches(msgT, defaultKeyMap.NextMulti):
-			cmds = append(cmds, m.nextField())
+			cmds = append(cmds, form.nextField())
 
 		case key.Matches(msgT, defaultKeyMap.Prev):
-			cmds = append(cmds, m.prevField())
+			cmds = append(cmds, form.prevField())
 
 		case key.Matches(msgT, defaultKeyMap.Submit):
 			// TODO: validate?
@@ -249,19 +249,19 @@ func (m form) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// delegate other messages to the field/model with focus...
 	if !handled {
 		var cmd tea.Cmd
-		m.texts, cmd = m.texts.Update(msg, m.focusedField)
+		form.texts, cmd = form.texts.Update(msg, form.focusedField)
 		// m.textareas, cmd = m.textareas.Update(msg, targetModel)
 		cmds = append(cmds, cmd)
 
 		// If the focused field is the body, check for dynamic->fixed size
 		// changing
-		if m.focusedField == bodyField {
-			body := m.texts.MustGet(bodyField)
-			if body.DynamicHeight() && body.Height() >= m.bodyMaxHeight {
+		if form.focusedField == bodyField {
+			body := form.texts.MustGet(bodyField)
+			if body.DynamicHeight() && body.Height() >= form.bodyMaxHeight {
 				body = body.SetDynamicHeight(false)
 				body = body.SetMaxHeight(0)
-				body = body.SetHeight(m.bodyMaxHeight)
-				m.texts = m.texts.Set(bodyField, body)
+				body = body.SetHeight(form.bodyMaxHeight)
+				form.texts = form.texts.Set(bodyField, body)
 			}
 		}
 	}
@@ -271,11 +271,11 @@ func (m form) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// 	m.err = nil
 	// }
 
-	return m, tea.Batch(cmds...)
+	return form, tea.Batch(cmds...)
 }
 
-func (m form) resize(width int, height int) form {
-	m.log = fmt.Sprintf("%dx%d", width, height)
+func (form mainForm) resize(width int, height int) mainForm {
+	form.log = fmt.Sprintf("%dx%d", width, height)
 
 	// We're going to manage the field borders separate from the text controls
 	// because textarea has some rendering challenges with doubling borders with
@@ -283,13 +283,13 @@ func (m form) resize(width int, height int) form {
 	// bw := 2
 	bh := 2
 
-	typ := m.texts.MustGet(typeField)
-	scope := m.texts.MustGet(scopeField)
-	desc := m.texts.MustGet(descriptionField)
-	body := m.texts.MustGet(bodyField)
-	footer := m.texts.MustGet(footerField)
+	typ := form.texts.MustGet(typeField)
+	scope := form.texts.MustGet(scopeField)
+	desc := form.texts.MustGet(descriptionField)
+	body := form.texts.MustGet(bodyField)
+	footer := form.texts.MustGet(footerField)
 
-	cfg := m.config
+	cfg := form.config
 
 	maxTyp := maxTypeLength(cfg)
 	typ = typ.SetCharLimit(maxTyp)
@@ -304,22 +304,22 @@ func (m form) resize(width int, height int) form {
 	body = body.SetWidth(min(cfg.BodyMaxLineLength, width))
 	helpHeight := 8
 	logHeight := 1
-	m.bodyMaxHeight = height - typ.Height() - bh - bh - helpHeight - logHeight - 1
-	body = body.SetMaxHeight(m.bodyMaxHeight)
+	form.bodyMaxHeight = height - typ.Height() - bh - bh - helpHeight - logHeight - 1
+	body = body.SetMaxHeight(form.bodyMaxHeight)
 
-	if body.DynamicHeight() && body.Height() >= m.bodyMaxHeight {
+	if body.DynamicHeight() && body.Height() >= form.bodyMaxHeight {
 		body = body.SetDynamicHeight(false)
 		body = body.SetMaxHeight(0)
-		body = body.SetHeight(m.bodyMaxHeight)
+		body = body.SetHeight(form.bodyMaxHeight)
 	}
 	// it would be nice to switch back to dynamic if the content shrinks, but
 	// there's no easy way to get "how many visual lines are needed?"
 
 	// not sizing footer yet!
 
-	m.help.SetWidth(width)
+	form.help.SetWidth(width)
 
-	m.texts = m.texts.SetMap(map[field]textModel{
+	form.texts = form.texts.SetMap(map[field]textModel{
 		typeField:        typ,
 		scopeField:       scope,
 		descriptionField: desc,
@@ -327,11 +327,11 @@ func (m form) resize(width int, height int) form {
 		footerField:      footer,
 	})
 
-	return m
+	return form
 }
 
 // updateFocus updates which field is currently focused.
-func (m form) setFocus(focusField field) (form, tea.Cmd) {
+func (form mainForm) setFocus(focusField field) (mainForm, tea.Cmd) {
 	modelMap := map[field]textModel{}
 	var cmds []tea.Cmd
 	var t2 textModel
@@ -339,7 +339,7 @@ func (m form) setFocus(focusField field) (form, tea.Cmd) {
 
 	// instead of a full loop, we could just blur the previous field!
 	for f := range maxField {
-		if t, ok := m.texts.Get(f); ok {
+		if t, ok := form.texts.Get(f); ok {
 			if f == focusField {
 				t2, cmd = t.Focus()
 			} else {
@@ -349,12 +349,12 @@ func (m form) setFocus(focusField field) (form, tea.Cmd) {
 			cmds = append(cmds, teautil.Wrap(cmd, f))
 		}
 	}
-	m.texts = m.texts.SetMap(modelMap)
-	m.focusedField = focusField
+	form.texts = form.texts.SetMap(modelMap)
+	form.focusedField = focusField
 
 	// NOTE: defaultKeyMap is a global, which isn't really the Elm Architecture
 	// way...
-	if m.texts.MustGet(m.focusedField).isArea {
+	if form.texts.MustGet(form.focusedField).isArea {
 		defaultKeyMap.NextSingle.SetEnabled(false)
 		defaultKeyMap.NextMulti.SetEnabled(true)
 	} else {
@@ -362,21 +362,21 @@ func (m form) setFocus(focusField field) (form, tea.Cmd) {
 		defaultKeyMap.NextMulti.SetEnabled(false)
 	}
 
-	return m, tea.Batch(cmds...)
+	return form, tea.Batch(cmds...)
 }
 
 // nextField moves to the next field.
-func (m form) nextField() tea.Cmd {
-	return setFocusCmd((m.focusedField + 1) % maxField)
+func (form mainForm) nextField() tea.Cmd {
+	return setFocusCmd((form.focusedField + 1) % maxField)
 }
 
 // prevField moves to the previous field.
-func (m form) prevField() tea.Cmd {
-	return setFocusCmd((m.focusedField + maxField - 1) % maxField)
+func (form mainForm) prevField() tea.Cmd {
+	return setFocusCmd((form.focusedField + maxField - 1) % maxField)
 }
 
 // validateDescription checks if the description field meets requirements.
-func (m form) validateDescription() error {
+func (form mainForm) validateDescription() error {
 	// description := strings.TrimSpace(desc.Value())
 	// if description == "" {
 	// 	return fmt.Errorf("description is required")
@@ -388,17 +388,17 @@ func (m form) validateDescription() error {
 }
 
 // View renders the TUI.
-func (m form) View() tea.View {
+func (form mainForm) View() tea.View {
 
 	// get all the child model views (Router helper?)
-	views := make(map[field]tea.View, m.texts.Len())
+	views := make(map[field]tea.View, form.texts.Len())
 
-	for f, t := range m.texts.All() {
+	for f, t := range form.texts.All() {
 		views[f] = t.View()
 	}
 
 	// get the focused field key bindings...
-	textKeyBindings := m.texts.MustGet(m.focusedField).GetKeyBindings()
+	textKeyBindings := form.texts.MustGet(form.focusedField).GetKeyBindings()
 
 	// It seems ridiculous to recalculate the keymap on every single view, but
 	// with an immutable pattern, we *can't* know if we have the same value call
@@ -420,12 +420,12 @@ func (m form) View() tea.View {
 			views[typeField].Content,
 			"(",
 			views[scopeField].Content,
-			"):",
+			"): ",
 			views[descriptionField].Content,
 		),
 		views[bodyField].Content,
 		views[footerField].Content,
-		m.help.View(helpKeys), // &defaultKeyMap),
+		form.help.View(helpKeys), // &defaultKeyMap),
 
 		// // debug config info
 		// fmt.Sprintf(
@@ -442,14 +442,14 @@ func (m form) View() tea.View {
 }
 
 // Result returns the composed commit message and any error.
-func (m form) Result() (*commit.Message, error) {
-	if m.err != nil {
-		return nil, m.err
+func (form mainForm) Result() (*commit.Message, error) {
+	if form.err != nil {
+		return nil, form.err
 	}
 
-	texts := make(map[field]string, m.texts.Len())
+	texts := make(map[field]string, form.texts.Len())
 
-	for f, t := range m.texts.All() {
+	for f, t := range form.texts.All() {
 		texts[f] = strings.TrimSpace(t.Value())
 	}
 
