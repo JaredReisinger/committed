@@ -15,7 +15,7 @@ func TestTextInput(t *testing.T) {
 	assert.Nil(t, text.Init())
 
 	// HACKHACK: just include the raw ANSI escapes for now
-	assert.Equal(t, "\x1b[38;5;232mP\x1b[m", text.View().Content)
+	assert.Equal(t, "\x1b[3;38;5;232mP\x1b[m", text.View().Content)
 
 	text2, cmd := text.Update(nil)
 	assert.Equal(t, text, text2)
@@ -31,7 +31,7 @@ func TestTextArea(t *testing.T) {
 	assert.Nil(t, text.Init())
 
 	// HACKHACK: just include the raw ANSI escapes for now
-	assert.Equal(t, "\x1b[38;5;232m\x1b[38;5;232m\x1b[38;5;232m\x1b[38;5;232m\x1b[m\x1b[m\x1b[38;5;232m\x1b[38;5;232mP\x1b[m\x1b[m\x1b[38;5;232m\x1b[38;5;232mLACEHOLDER\x1b[m\x1b[m\x1b[38;5;232m                       \x1b[m      \x1b[m\x1b[m\n\x1b[38;5;232m\x1b[38;5;232m\x1b[38;5;232m\x1b[38;5;232m\x1b[m\x1b[m\x1b[38;5;232m \x1b[m                                       \x1b[m\x1b[m\n\x1b[38;5;232m\x1b[38;5;232m\x1b[38;5;232m\x1b[38;5;232m\x1b[m\x1b[m\x1b[38;5;232m \x1b[m                                       \x1b[m\x1b[m\n\x1b[38;5;232m\x1b[38;5;232m\x1b[38;5;232m\x1b[38;5;232m\x1b[m\x1b[m\x1b[38;5;232m \x1b[m                                       \x1b[m\x1b[m\n\x1b[38;5;232m\x1b[38;5;232m\x1b[38;5;232m\x1b[38;5;232m\x1b[m\x1b[m\x1b[38;5;232m \x1b[m                                       \x1b[m\x1b[m\n\x1b[38;5;232m\x1b[38;5;232m\x1b[38;5;232m\x1b[38;5;232m\x1b[m\x1b[m\x1b[38;5;232m \x1b[m                                       \x1b[m\x1b[m", text.View().Content)
+	assert.Equal(t, "\x1b[38;5;232m\x1b[38;5;232m\x1b[38;5;232m\x1b[38;5;232m\x1b[m\x1b[m\x1b[38;5;232m\x1b[3;38;5;232mP\x1b[m\x1b[m\x1b[38;5;232m\x1b[3;38;5;232mLACEHOLDER\x1b[m\x1b[m\x1b[38;5;232m                       \x1b[m      \x1b[m\x1b[m\n\x1b[38;5;232m\x1b[38;5;232m\x1b[3;38;5;232m\x1b[38;5;232m\x1b[m\x1b[m\x1b[38;5;232m \x1b[m                                       \x1b[m\x1b[m\n\x1b[38;5;232m\x1b[38;5;232m\x1b[3;38;5;232m\x1b[38;5;232m\x1b[m\x1b[m\x1b[38;5;232m \x1b[m                                       \x1b[m\x1b[m\n\x1b[38;5;232m\x1b[38;5;232m\x1b[3;38;5;232m\x1b[38;5;232m\x1b[m\x1b[m\x1b[38;5;232m \x1b[m                                       \x1b[m\x1b[m\n\x1b[38;5;232m\x1b[38;5;232m\x1b[3;38;5;232m\x1b[38;5;232m\x1b[m\x1b[m\x1b[38;5;232m \x1b[m                                       \x1b[m\x1b[m\n\x1b[38;5;232m\x1b[38;5;232m\x1b[3;38;5;232m\x1b[38;5;232m\x1b[m\x1b[m\x1b[38;5;232m \x1b[m                                       \x1b[m\x1b[m", text.View().Content)
 
 	text2, cmd := text.Update(nil)
 	assert.Equal(t, text, text2)

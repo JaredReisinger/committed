@@ -9,25 +9,28 @@ import (
 
 var (
 	underBorder = lipgloss.Border{
-		Top:          " ",
-		Bottom:       "─",
-		Left:         " ",
-		Right:        " ",
-		TopLeft:      " ",
-		TopRight:     " ",
-		BottomLeft:   "╶",
-		BottomRight:  "╴",
-		MiddleLeft:   " ",
-		MiddleRight:  " ",
-		Middle:       " ",
-		MiddleTop:    " ",
-		MiddleBottom: " ",
+		// Top:          " ",
+		Bottom: "─",
+		// Left:         " ",
+		// Right:        " ",
+		// TopLeft:      " ",
+		// TopRight:     " ",
+		BottomLeft:  "╶",
+		BottomRight: "╴",
+		// MiddleLeft:   " ",
+		// MiddleRight:  " ",
+		// Middle:       " ",
+		// MiddleTop:    " ",
+		// MiddleBottom: " ",
 	}
+
+	// bodyBorder =
 
 	// focusedTextStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("250"))
 
 	placeholderStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("232"))
+				Foreground(lipgloss.Color("232")).
+				Italic(true)
 
 	defaultTextStyles = textStyles{
 		Focused: textPartStyles{
@@ -42,4 +45,18 @@ var (
 			Color: lipgloss.Color("#900090"),
 		},
 	}
+
+	singleDecoration = lipgloss.NewStyle().
+				Border(underBorder, false, false, true, false)
+
+	areaDecoration = lipgloss.NewStyle().
+			Border(lipgloss.NormalBorder(), true, true, true, true)
+
+	focusColor = lipgloss.Color("#ff00ff")
+	blurColor  = lipgloss.Color("#808080")
+
+	focusSingle = singleDecoration.BorderForeground(focusColor)
+	blurSingle  = singleDecoration.BorderForeground(blurColor)
+	focusArea   = areaDecoration.BorderForeground(focusColor)
+	blurArea    = areaDecoration.BorderForeground(blurColor)
 )

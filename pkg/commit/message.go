@@ -10,7 +10,8 @@ type Message struct {
 	Scope       string
 	Description string
 	Body        string
-	Footers     []Footer
+	Footer      string
+	Footers     []Footer // ???
 	Breaking    bool
 	RawMessage  string // not sure we need this
 }
@@ -52,6 +53,9 @@ func (m *Message) String() string {
 			}
 			b.WriteString(footer.Token + ": " + footer.Value)
 		}
+	} else if m.Footer != "" {
+		b.WriteString("\n\n")
+		b.WriteString(m.Footer)
 	}
 
 	b.WriteString("\n")

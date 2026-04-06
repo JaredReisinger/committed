@@ -79,7 +79,7 @@ func newModel(cfg *config.Config, existingMsg *commit.Message) mainForm {
 			scopeField:       newTextModel(false, "scope", initialScope),
 			descriptionField: newTextModel(false, "description", initialDesc),
 			bodyField:        newTextModel(true, "message body", initialBody),
-			footerField:      newTextModel(true, "footer", initialFooter),
+			footerField:      newTextModel(true, "footer", initialFooter).SetMinHeight(2).SetDynamicHeight(true),
 		}),
 
 		help: help,
@@ -315,7 +315,7 @@ func (form mainForm) resize(width int, height int) mainForm {
 	// it would be nice to switch back to dynamic if the content shrinks, but
 	// there's no easy way to get "how many visual lines are needed?"
 
-	// not sizing footer yet!
+	footer = footer.SetWidth(min(cfg.BodyMaxLineLength, width))
 
 	form.help.SetWidth(width)
 
@@ -389,12 +389,23 @@ func (form mainForm) validateDescription() error {
 
 // View renders the TUI.
 func (form mainForm) View() tea.View {
-
-	// get all the child model views (Router helper?)
-	views := make(map[field]tea.View, form.texts.Len())
+	renders := make(map[field]string, form.texts.Len())
 
 	for f, t := range form.texts.All() {
-		views[f] = t.View()
+		focused := f == form.focusedField
+		decoration := blurSingle
+		if !t.isArea {
+			if focused {
+				decoration = focusSingle
+			}
+		} else {
+			if focused {
+				decoration = focusArea
+			} else {
+				decoration = blurArea
+			}
+		}
+		renders[f] = decoration.Render(t.View().Content)
 	}
 
 	// get the focused field key bindings...
@@ -407,24 +418,21 @@ func (form mainForm) View() tea.View {
 	helpKeys := buildHelpKeys(textKeyBindings)
 
 	// TODO: use lipgloss.NewLayer() and compositor.Compose() to handle z-depth
-	// rendering
+	// rendering?
 
 	view := lipgloss.JoinVertical(
 		lipgloss.Left,
-		// "\n",
-		// ruler...
-		// "          1         2         3         4         5         6         7         8         9         0\n",
-		// " 1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890",
+		"\n",
 		lipgloss.JoinHorizontal(
 			lipgloss.Top,
-			views[typeField].Content,
+			renders[typeField],
 			"(",
-			views[scopeField].Content,
+			renders[scopeField],
 			"): ",
-			views[descriptionField].Content,
+			renders[descriptionField],
 		),
-		views[bodyField].Content,
-		views[footerField].Content,
+		renders[bodyField],
+		renders[footerField],
 		form.help.View(helpKeys), // &defaultKeyMap),
 
 		// // debug config info
@@ -461,7 +469,7 @@ func (form mainForm) Result() (*commit.Message, error) {
 		Scope:       texts[scopeField],
 		Description: texts[descriptionField],
 		Body:        texts[bodyField],
-		// Footer:      texts[footerField], // a slice?
+		Footer:      texts[footerField],
 	}
 
 	// if len(m.config.Types) > 0 && m.typeIndex >= 0 && m.typeIndex < len(m.config.Types) {
