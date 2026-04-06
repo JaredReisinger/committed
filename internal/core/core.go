@@ -11,6 +11,8 @@ import (
 	"github.com/jaredreisinger/committed/pkg/commit"
 )
 
+var testBypass = false
+
 func Run(args []string, dryRun bool) error {
 	file, _, _, err := hook.ExtractArgs(args, dryRun)
 	if err != nil {
@@ -37,9 +39,12 @@ func Run(args []string, dryRun bool) error {
 		msg = &commit.Message{Body: incoming}
 	}
 
-	msg, err = tui.Run(cfg, msg)
-	if err != nil {
-		return err
+	// Haven't figured out a good way to test the UI yet!
+	if !testBypass {
+		msg, err = tui.Run(cfg, msg)
+		if err != nil {
+			return err
+		}
 	}
 
 	if !dryRun {

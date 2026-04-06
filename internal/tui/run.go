@@ -9,10 +9,13 @@ import (
 	"github.com/jaredreisinger/committed/pkg/commit"
 )
 
+var testHookProgram *tea.Program
+
 func Run(cfg *config.Config, existingMsg *commit.Message) (*commit.Message, error) {
 	m := newModel(cfg, existingMsg)
 
 	p := tea.NewProgram(m)
+	testHookProgram = p
 
 	finalModel, err := p.Run()
 	if err != nil {

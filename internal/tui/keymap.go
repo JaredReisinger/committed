@@ -55,6 +55,7 @@ func (k *keyMap) ShortHelp() []key.Binding {
 		k.NextMulti,
 		k.Prev,
 		k.Cancel,
+		k.Submit,
 	}
 }
 
@@ -66,12 +67,7 @@ func buildHelpKeys(textKeyBindings []key.Binding) help.KeyMap {
 	// combine maps
 	h := &helpMap{}
 
-	h.short = []key.Binding{
-		defaultKeyMap.NextSingle,
-		defaultKeyMap.NextMulti,
-		defaultKeyMap.Prev,
-		defaultKeyMap.Cancel,
-	}
+	h.short = defaultKeyMap.ShortHelp()
 	h.short = append(h.short, textKeyBindings...)
 
 	// For the long list, it's 6 or 7 per group, and we can tell based on the
