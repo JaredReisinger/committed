@@ -7,8 +7,8 @@ import (
 
 	"github.com/jaredreisinger/committed/internal/config"
 	"github.com/jaredreisinger/committed/internal/hook"
+	"github.com/jaredreisinger/committed/internal/tui"
 	"github.com/jaredreisinger/committed/pkg/commit"
-	"github.com/jaredreisinger/committed/pkg/tui"
 )
 
 func Run(args []string, dryRun bool) error {

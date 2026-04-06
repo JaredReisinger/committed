@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"image/color"
+
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/textarea"
 	"charm.land/bubbles/v2/textinput"
@@ -29,7 +31,20 @@ func newTextInput(placeholder string) textinputModel {
 	m := textinput.New()
 	m.Prompt = ""
 	m.Placeholder = placeholder
-	// set styles?
+
+	m.SetStyles(textinput.Styles{
+		Focused: textinput.StyleState{
+			Text:        defaultTextStyles.Focused.Text,
+			Placeholder: defaultTextStyles.Focused.Placeholder,
+		},
+		Blurred: textinput.StyleState{
+			Text:        defaultTextStyles.Blurred.Text,
+			Placeholder: defaultTextStyles.Blurred.Placeholder,
+		},
+		Cursor: textinput.CursorStyle{
+			Color: defaultTextStyles.Cursor.Color,
+		},
+	})
 
 	return textinputModel{m}
 }
@@ -63,7 +78,21 @@ func newTextArea(placeholder string) textareaModel {
 	m.DynamicHeight = true
 	m.MinHeight = 10 //?
 
-	// set styles?
+	m.SetStyles(textarea.Styles{
+		Focused: textarea.StyleState{
+			Base:        defaultTextStyles.Focused.Text,
+			Text:        defaultTextStyles.Focused.Text,
+			Placeholder: defaultTextStyles.Focused.Placeholder,
+		},
+		Blurred: textarea.StyleState{
+			Base:        defaultTextStyles.Blurred.Text,
+			Text:        defaultTextStyles.Blurred.Text,
+			Placeholder: defaultTextStyles.Blurred.Placeholder,
+		},
+		Cursor: textarea.CursorStyle{
+			Color: defaultTextStyles.Cursor.Color,
+		},
+	})
 
 	return textareaModel{m}
 }
@@ -494,11 +523,12 @@ func (t textModel) GetKeyBindings() []key.Binding {
 
 // unified style support
 type textStyles struct {
-	Focused textPartStyle
-	Blurred textPartStyle
+	Focused textPartStyles
+	Blurred textPartStyles
+	Cursor  textCursorStyle
 }
 
-type textPartStyle struct {
+type textPartStyles struct {
 	Text        lipgloss.Style
 	Placeholder lipgloss.Style
 	// Prompt      lipgloss.Style // we never use prompt
@@ -516,16 +546,20 @@ type textPartStyle struct {
 	// EndOfBuffer      lipgloss.Style
 }
 
+type textCursorStyle struct {
+	Color color.Color
+}
+
 func (t textModel) Styles() textStyles {
 	var s textStyles
 	if !t.isArea {
 		i := t.input.Styles()
 		s = textStyles{
-			Focused: textPartStyle{
+			Focused: textPartStyles{
 				Text:        i.Focused.Text,
 				Placeholder: i.Focused.Placeholder,
 			},
-			Blurred: textPartStyle{
+			Blurred: textPartStyles{
 				Text:        i.Blurred.Text,
 				Placeholder: i.Blurred.Placeholder,
 			},
@@ -533,11 +567,11 @@ func (t textModel) Styles() textStyles {
 	} else {
 		a := t.area.Styles()
 		s = textStyles{
-			Focused: textPartStyle{
+			Focused: textPartStyles{
 				Text:        a.Focused.Text,
 				Placeholder: a.Focused.Placeholder,
 			},
-			Blurred: textPartStyle{
+			Blurred: textPartStyles{
 				Text:        a.Blurred.Text,
 				Placeholder: a.Blurred.Placeholder,
 			},
@@ -561,6 +595,9 @@ func (t textModel) SetStyles(s textStyles) textModel {
 				Text:        s.Blurred.Text,
 				Placeholder: s.Blurred.Placeholder,
 			},
+			Cursor: textinput.CursorStyle{
+				Color: s.Cursor.Color,
+			},
 		})
 	} else {
 		t2.area.SetStyles(textarea.Styles{
@@ -573,6 +610,9 @@ func (t textModel) SetStyles(s textStyles) textModel {
 				Base:        s.Blurred.Text,
 				Text:        s.Blurred.Text,
 				Placeholder: s.Blurred.Placeholder,
+			},
+			Cursor: textarea.CursorStyle{
+				Color: s.Cursor.Color,
 			},
 		})
 	}
