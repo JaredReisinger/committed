@@ -42,7 +42,7 @@ func TestWrap(t *testing.T) {
 				actualCallCount++
 				wrapper, ok := msg.(WrappedMsg[int])
 				assert.True(t, ok)
-				assert.Equal(t, c.id, wrapper.Id)
+				assert.Equal(t, c.id, wrapper.Key)
 				assert.True(t, reflect.ValueOf(wrapper.Msg).Type().AssignableTo(c.expectedMsgType))
 			}
 

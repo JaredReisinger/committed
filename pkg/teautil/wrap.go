@@ -8,19 +8,17 @@ import (
 
 // WrappedMsg represents a wrapper around the Msg returned from a Cmd. See
 // [Wrap] for further details.
-type WrappedMsg[I ~int] struct {
-	Id  I
+type WrappedMsg[K comparable] struct {
+	Key K
 	Msg tea.Msg
 }
 
 // Wrap allows a parent component to accurately wrap the results of any Cmd,
 // regardless of whether it's a direct Cmd or a collective one like [tea.Batch]
-// or [tea.Sequence].  Note that the "wrapping" arg could also be an
-// interface{}, or a generic type, or even a full `func(Cmd) Msg` (for the most
-// flexibility), but using an int seems to satisfy the 80:20 rule of the
-// simplest solution for the most-common case: enabling routing for
-// sub-components.
-func Wrap[I ~int](cmd tea.Cmd, id I) tea.Cmd {
+// or [tea.Sequence].  This function is used by [Router] to automatically wrap
+// commands returned from child models in [Router.Update] and
+// [Router.UpdateAll].
+func Wrap[K comparable](cmd tea.Cmd, key K) tea.Cmd {
 	if cmd == nil {
 		return cmd
 	}
@@ -49,7 +47,7 @@ func Wrap[I ~int](cmd tea.Cmd, id I) tea.Cmd {
 				for i := 0; i < v.Len(); i++ {
 					el := v.Index(i)
 					innerCmd := el.Interface().(tea.Cmd)
-					el.Set(reflect.ValueOf(Wrap(innerCmd, id)))
+					el.Set(reflect.ValueOf(Wrap(innerCmd, key)))
 				}
 
 				return v.Interface()
@@ -59,7 +57,7 @@ func Wrap[I ~int](cmd tea.Cmd, id I) tea.Cmd {
 
 		default:
 			// for all other messages, we "simply" wrap the result
-			return WrappedMsg[I]{Id: id, Msg: msg}
+			return WrappedMsg[K]{Key: key, Msg: msg}
 		}
 	}
 }

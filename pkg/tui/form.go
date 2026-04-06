@@ -83,7 +83,7 @@ func newModel(cfg *config.Config, existingMsg *commit.Message) formModel {
 
 	body := stdText(true)
 	body.Placeholder = "Detailed description (optional)"
-	body.KeyMap.InsertNewline.SetEnabled(false)
+	body.KeyMap.InsertNewline.SetEnabled(true)
 	// Border is *outside* the width, but prompt/line-numbers are inside, except
 	// if there's *no* prompt or line numbers, the border is included in the
 	// width. At least that what appears to happen. The code looks like it tries
@@ -102,18 +102,22 @@ func newModel(cfg *config.Config, existingMsg *commit.Message) formModel {
 		// typ:          typ,
 		// description:  description,
 		// body:         body,
-		models:    teautil.NewRouter(typeField, textareaShim{typ}, textareaShim{description}, textareaShim{body}),
+		models: teautil.NewRouter(map[field]textareaShim{
+			typeField:        {typ},
+			descriptionField: {description},
+			bodyField:        {body},
+		}),
 		help:      help,
 		typeIndex: 0,
 	}
 
 	// Pre-populate fields if we have an existing message
 	if existingMsg != nil {
-		m.populateFromExisting()
+		m = m.populateFromExisting()
 	}
 
 	// Set initial focus
-	m.updateFocus()
+	m = m.updateFocus()
 
 	return m
 }
@@ -130,14 +134,10 @@ func maxTypeLength(cfg *config.Config) int {
 }
 
 // populateFromExisting fills the form fields from an existing commit message.
-func (m *formModel) populateFromExisting() {
+func (m formModel) populateFromExisting() formModel {
 	if m.existingMsg == nil {
-		return
+		return m
 	}
-
-	typ := m.models.MustIndex(typeField)
-	desc := m.models.MustIndex(descriptionField)
-	body := m.models.MustIndex(bodyField)
 
 	// Set type
 	if m.existingMsg.Type != "" {
@@ -145,22 +145,30 @@ func (m *formModel) populateFromExisting() {
 		for i, t := range m.config.Types {
 			if t == m.existingMsg.Type {
 				m.typeIndex = i
+				typ := m.models.MustGet(typeField)
 				typ.SetValue(t)
 				typ.MoveToBegin()
+				m.models = m.models.Set(typeField, typ)
 				break
 			}
 		}
 	}
 
 	if m.existingMsg.Description != "" {
+		desc := m.models.MustGet(descriptionField)
 		desc.SetValue(m.existingMsg.Description)
 		desc.MoveToBegin()
+		m.models = m.models.Set(descriptionField, desc)
 	}
 
 	if m.existingMsg.Body != "" {
+		body := m.models.MustGet(bodyField)
 		body.SetValue(m.existingMsg.Body)
 		body.MoveToBegin()
+		m.models = m.models.Set(bodyField, body)
 	}
+
+	return m
 }
 
 // Init initializes the bubbletea program.
@@ -181,7 +189,7 @@ func (m formModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msgT := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.resize(msgT.Width, msgT.Height)
+		m = m.resize(msgT.Width, msgT.Height)
 		handled = true
 	case tea.KeyPressMsg:
 		handled = true // assume handled, set back to false in default case
@@ -191,10 +199,10 @@ func (m formModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case key.Matches(msgT, defaultKeyMap.NextSingle) ||
 			key.Matches(msgT, defaultKeyMap.NextMulti):
-			m.nextField()
+			m = m.nextField()
 
 		case key.Matches(msgT, defaultKeyMap.Prev):
-			m.prevField()
+			m = m.prevField()
 
 		case key.Matches(msgT, defaultKeyMap.Submit):
 			// TODO: validate?
@@ -241,7 +249,7 @@ func (m formModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case teautil.WrappedMsg[int]:
 		// forward the message to the appropriate model...
-		targetModel = field(msgT.Id)
+		targetModel = field(msgT.Key)
 		msg = msgT.Msg
 		// *don't* set handled!
 	}
@@ -253,11 +261,12 @@ func (m formModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, cmd)
 
 		if targetModel == bodyField {
-			body := m.models.MustIndex(bodyField)
+			body := m.models.MustGet(bodyField)
 			if body.DynamicHeight && body.Height() >= m.bodyMaxHeight {
 				body.DynamicHeight = false
 				body.MaxHeight = 0
 				body.SetHeight(m.bodyMaxHeight)
+				m.models = m.models.Set(bodyField, body)
 			}
 		}
 	}
@@ -270,7 +279,7 @@ func (m formModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-func (m *formModel) resize(width int, height int) {
+func (m formModel) resize(width int, height int) formModel {
 	m.log = fmt.Sprintf("%dx%d", width, height)
 
 	// Border is *outside* the width, but prompt/line-numbers are inside, except
@@ -278,9 +287,9 @@ func (m *formModel) resize(width int, height int) {
 	// width. At least that what appears to happen. The code looks like it tries
 	// to include margin+border+padding+content. 🤷🏼‍♂️
 
-	typ := m.models.MustIndex(typeField)
-	desc := m.models.MustIndex(descriptionField)
-	body := m.models.MustIndex(bodyField)
+	typ := m.models.MustGet(typeField)
+	desc := m.models.MustGet(descriptionField)
+	body := m.models.MustGet(bodyField)
 
 	xx, yy := typ.Styles().Focused.Base.GetFrameSize()
 	cfg := m.config
@@ -309,55 +318,53 @@ func (m *formModel) resize(width int, height int) {
 	// there's no easy way to get "how many visual lines are needed?"
 
 	m.help.SetWidth(xx)
+
+	m.models = m.models.Set(typeField, typ)
+	m.models = m.models.Set(descriptionField, desc)
+	m.models = m.models.Set(bodyField, body)
+
+	return m
 }
 
 // updateFocus updates which field is currently focused.
-func (m *formModel) updateFocus() {
-	typ := m.models.MustIndex(typeField)
-	desc := m.models.MustIndex(descriptionField)
-	body := m.models.MustIndex(bodyField)
+func (m formModel) updateFocus() formModel {
+	for key := range m.models.Keys() {
+		f := m.models.MustGet(key)
+		if key == m.focusedField {
+			f.Focus()
+		} else {
+			f.Blur()
+		}
+		m.models = m.models.Set(key, f)
+	}
 
-	typ.Blur()
-	desc.Blur()
-	body.Blur()
-
-	// NOTE: we *should not* have to update the insert-newline keybinding. As a
-	// value struct, each textarea should have its own copy. And yet... they
-	// seem to be conflated, for some reason.
-
-	switch m.focusedField {
-	case typeField:
-		typ.Focus()
-		typ.KeyMap.InsertNewline.SetEnabled(false)
-		defaultKeyMap.NextSingle.SetEnabled(true)
-		defaultKeyMap.NextMulti.SetEnabled(false)
-	case descriptionField:
-		desc.Focus() // returned tea.Cmd ignored!
-		desc.KeyMap.InsertNewline.SetEnabled(false)
-		defaultKeyMap.NextSingle.SetEnabled(true)
-		defaultKeyMap.NextMulti.SetEnabled(false)
-	case bodyField:
-		body.Focus() // returned tea.Cmd ignored!
-		body.KeyMap.InsertNewline.SetEnabled(true)
+	// NOTE: defaultKeyMap is a global, which isn't really the Elm Architecture
+	// way...
+	if m.focusedField == bodyField {
 		defaultKeyMap.NextSingle.SetEnabled(false)
 		defaultKeyMap.NextMulti.SetEnabled(true)
+	} else {
+		defaultKeyMap.NextSingle.SetEnabled(true)
+		defaultKeyMap.NextMulti.SetEnabled(false)
 	}
+
+	return m
 }
 
 // nextField moves to the next field.
-func (m *formModel) nextField() {
+func (m formModel) nextField() formModel {
 	m.focusedField = (m.focusedField + 1) % maxField
-	m.updateFocus()
+	return m.updateFocus()
 }
 
 // prevField moves to the previous field.
-func (m *formModel) prevField() {
+func (m formModel) prevField() formModel {
 	m.focusedField = (m.focusedField + maxField - 1) % maxField
-	m.updateFocus()
+	return m.updateFocus()
 }
 
 // validateDescription checks if the description field meets requirements.
-func (m *formModel) validateDescription() error {
+func (m formModel) validateDescription() error {
 	// description := strings.TrimSpace(desc.Value())
 	// if description == "" {
 	// 	return fmt.Errorf("description is required")
@@ -370,9 +377,9 @@ func (m *formModel) validateDescription() error {
 
 // View renders the TUI.
 func (m formModel) View() tea.View {
-	typ := m.models.MustIndex(typeField)
-	desc := m.models.MustIndex(descriptionField)
-	body := m.models.MustIndex(bodyField)
+	typ := m.models.MustGet(typeField)
+	desc := m.models.MustGet(descriptionField)
+	body := m.models.MustGet(bodyField)
 
 	// TODO: use lipgloss.NewLayer() and compositor.Compose() to handle z-depth
 	// rendering
@@ -429,9 +436,9 @@ func (m formModel) Result() (*commit.Message, error) {
 	// if !m.done {
 	// 	return nil, fmt.Errorf("form not completed")
 	// }
-	typ := m.models.MustIndex(typeField)
-	desc := m.models.MustIndex(descriptionField)
-	body := m.models.MustIndex(bodyField)
+	typ := m.models.MustGet(typeField)
+	desc := m.models.MustGet(descriptionField)
+	body := m.models.MustGet(bodyField)
 
 	msg := &commit.Message{
 		Type:        strings.TrimSpace(typ.Value()),
