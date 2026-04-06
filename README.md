@@ -1,12 +1,32 @@
 # committed
 
-A Go-native, bubbletea-powered TUI that integrates as a proper `commit-msg` hook for conventional commits.
+[![Go reference](https://img.shields.io/badge/pkg.go.dev-jaredreisinger/committed-007D9C?logo=go&logoColor=white)](https://pkg.go.dev/github.com/jaredreisinger/committed)
+![GitHub go.mod Go
+version](https://img.shields.io/github/go-mod/go-version/JaredReisinger/committed?logo=go&logoColor=white)
+[![GitHub Actions workflow status](https://img.shields.io/github/actions/workflow/status/JaredReisinger/committed/ci.yaml?logo=github&logoColor=white)](https://github.com/JaredReisinger/committed/actions/workflows/ci.yaml)
+[![codacy
+grade](https://img.shields.io/codacy/grade/f9e05f25d82e4c5d8b5421b54b49af38?logo=codacy)](https://app.codacy.com/gh/JaredReisinger/committed)
+[![code coverage](https://img.shields.io/codecov/c/github/JaredReisinger/committed?logo=codecov&logoColor=white)](https://app.codecov.io/gh/JaredReisinger/committed)
+![GitHub License](https://img.shields.io/github/license/JaredReisinger/committed)
+
+A bubbletea-powered text UI that integrates as a proper `commit-msg` hook for conventional commits.
 
 ## Installation
+
+Either grab the binary appropriate to your platform from the [Releases](https://github.com/JaredReisinger/committed/releases) page, or install directly from Go:
 
 ```bash
 go install github.com/jaredreisinger/committed@latest
 ```
+
+> [!NOTE]
+>
+> If you're using Go 1.24 or later, you can also add `committed` as a tool dependency via:
+>
+> ```bash
+> go get -tool github.com/jaredreisinger/committed@latest
+> ```
+
 
 ## Usage
 
@@ -30,6 +50,20 @@ EOF
 chmod +x .git/hooks/commit-msg
 ```
 
+> [!NOTE]
+>
+> If you're using Go 1.24 or later, and added `committed` as a tool dependency, you can start it with `go tool committed`:
+>
+> ```bash
+> cat <<EOF > .git/hooks/commit-msg
+> #!/usr/bin/sh
+> go tool committed $@
+> EOF
+>
+> chmod +x .git/hooks/commit-msg
+> ```
+
+
 Now when you run `git commit`, the TUI will appear to help format your commit message.
 
 ### Manual Usage
@@ -39,6 +73,15 @@ You can also run the tool manually; it will load/edit the given file:
 ```bash
 committed /path/to/COMMIT_EDITMSG
 ```
+
+> [!NOTE]
+>
+> If you're using Go 1.24 or later, and added `committed` as a tool dependency, you can start it with::
+>
+> ```bash
+> go tool committed /path/to/COMMIT_EDITMSG
+> ```
+
 
 ## Configuration
 
@@ -62,14 +105,14 @@ The tool automatically detects conventional commit configuration from:
 ## Features
 
 - Interactive TUI for composing conventional commits
-- Automatic detection of project conventions
+- (TODO) Automatic detection of project conventions
 - Pre-population from existing commit messages
-- Real-time validation with helpful error messages
+- (TODO) Real-time validation with helpful error messages
 - Support for conventional commit format with type, scope, description, and body
 
 ## Development
 
-We leverage [`task`](https://taskfile.dev) to manage testing and building.
+This project leverages [`task`](https://taskfile.dev) to manage testing and building.
 
 ```bash
 # Run tests
