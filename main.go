@@ -2,16 +2,16 @@
 // text UI in the vein of [commitizen] or [git-cz], intended to make it easier
 // to write a conventional commit message correctly, and harder to get wrong.
 //
-// Unlike many other commit-helper tools, it is not expected to be invoked
-// directly on the command-line; it is expected to be invoked as a Git
-// [commit-msg] hook. This means that it does not create the commit in and of
-// itself, it is only concerned with setting up the commit message.
+// Unlike many other commit-helper tools, committed does not expect to be
+// invoked directly on the command-line; it expects to be invoked as a Git
+// [commit-msg] hook. This means that committed does not create the commit in
+// and of itself, it is only concerned with editing the commit message.
 //
 // Committed attempts to discover any conventional-commit configurations in use
 // by the current repo to ensure it provides an accurate reflection of the
 // expected types, description length requirements, body format, and so on.  In
 // theory, any message created by committed should necessarily pass a commitlint
-// check.
+// check using the same configuration.
 //
 // [commitizen]: https://commitizen-tools.github.io/commitizen/
 // [git-cz]: https://github.com/streamich/git-cz
