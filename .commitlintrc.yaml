@@ -1,0 +1,7 @@
+rules:
+  type-enum: [ 2, always, [build, chore, ci, docs, feat, fix, perf, refactor, revert, style, test] ]
+  type-case: [ 2, always, lower-case ]
+  type-empty: [ 2, always, false ]
+  scope-case: [ 2, always, lower-case ]
+  subject-max-length: [ 2, always, 50 ]
+  body-max-line-length: [ 2, always, 70 ]

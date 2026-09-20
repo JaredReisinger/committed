@@ -15,7 +15,8 @@ const (
 )
 
 var (
-	dryRun bool
+	dryRun  bool
+	logFile string
 
 	rootCmd = &cobra.Command{
 		Use:   "committed [message-file] [source] [sha1]",
@@ -32,7 +33,7 @@ integrate with git hooks.
 			cmd.SilenceUsage = true
 			// cmd.SilenceErrors = true
 
-			return core.Run(args, dryRun)
+			return core.Run(args, dryRun, logFile)
 		},
 	}
 )
@@ -45,6 +46,7 @@ func init() {
 	}
 
 	rootCmd.PersistentFlags().BoolVarP(&dryRun, "dry-run", "n", false, "test the UI without saving anything")
+	rootCmd.PersistentFlags().StringVarP(&logFile, "log-file", "l", "", "file to write logging to")
 }
 
 func ifElse(test *bool, trueArgs cobra.PositionalArgs, falseArgs cobra.PositionalArgs) cobra.PositionalArgs {

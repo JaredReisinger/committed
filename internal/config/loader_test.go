@@ -1,11 +1,19 @@
 package config
 
 import (
+	"log/slog"
+	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/go-openapi/testify/v2/assert"
 )
+
+func init() {
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	})))
+}
 
 // use testdata files...
 func TestParseConfig_Simple(t *testing.T) {
@@ -15,6 +23,7 @@ func TestParseConfig_Simple(t *testing.T) {
 	for _, path := range paths {
 		t.Run(path, func(t *testing.T) {
 			t.Parallel()
+			t.Logf("testing %s", path)
 			cfg, err := parseConfigFile(path)
 			assert.NoError(t, err)
 

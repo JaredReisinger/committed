@@ -1,14 +1,16 @@
 package config
 
 import (
-	"encoding/json"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"io/fs"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/jaredreisinger/committed/internal/config/commitlint"
 	"gopkg.in/yaml.v3"
 )
 
@@ -24,6 +26,7 @@ func LoadConfig(workDir string) (*Config, error) {
 
 	for _, entry := range paths {
 		candidate := filepath.Join(workDir, entry)
+		slog.Debug("checking for config", "candidate", candidate)
 		if _, err := os.Stat(candidate); err != nil {
 			if errors.Is(err, fs.ErrNotExist) {
 				continue
@@ -44,11 +47,12 @@ func LoadConfig(workDir string) (*Config, error) {
 // We really need to struct drive this...
 
 type packageJson struct {
-	Commitlint *commitlintCfg `json:"commitlint"`
-	Commitizen any            `json:"commitizen"`
+	Commitlint *commitlint.Config `json:"commitlint"`
+	Commitizen any                `json:"commitizen"`
 }
 
 func parseConfigFile(path string) (*Config, error) {
+	slog.Debug("parsing config", "path", path)
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -58,10 +62,11 @@ func parseConfigFile(path string) (*Config, error) {
 	ext := filepath.Ext(file)
 	base := strings.TrimSuffix(file, ext)
 	cfg := DefaultConfig()
+	parsed := true
 
 	switch base {
 	case ".commitlintrc":
-		raw := commitlintCfg{}
+		raw := commitlint.Config{}
 		switch ext {
 		case ".json":
 			err = json.Unmarshal(data, &raw)
@@ -72,9 +77,8 @@ func parseConfigFile(path string) (*Config, error) {
 			return nil, err
 		}
 
-		// should take more than rules!
-		applyCommitlintRules(cfg, raw.Rules)
-		return cfg, nil
+		// slog.Debug("parsed .commitlintrc", "raw", raw)
+		cfg.applyCommitlint(raw.Rules)
 
 	case "package":
 		if ext != ".json" {
@@ -86,11 +90,38 @@ func parseConfigFile(path string) (*Config, error) {
 			return nil, err
 		}
 
+		// slog.Debug("parsed package.json", "raw", raw)
 		if raw.Commitlint != nil {
-			applyCommitlintRules(cfg, raw.Commitlint.Rules)
-			return cfg, nil
+			cfg.applyCommitlint(raw.Commitlint.Rules)
 		}
+	default:
+		parsed = false
+	}
+
+	if parsed {
+		slog.Debug("using config", "config", cfg)
+		return cfg, nil
 	}
 
 	return nil, fmt.Errorf("unsupported config extension: %s", ext)
+}
+
+func (cfg *Config) applyCommitlint(rules commitlint.Rules) {
+	slog.Debug("applying commitlint rules")
+
+	if rules.TypeEnum.Set {
+		cfg.Types = rules.TypeEnum.Value
+	}
+
+	if rules.SubjectMaxLength.Set {
+		cfg.SubjectMaxLength = rules.SubjectMaxLength.Value
+	}
+
+	if rules.BodyMaxLineLength.Set {
+		cfg.BodyMaxLineLength = rules.BodyMaxLineLength.Value
+	}
+
+	if rules.HeaderMaxLength.Set {
+		cfg.HeaderMaxLength = rules.HeaderMaxLength.Value
+	}
 }

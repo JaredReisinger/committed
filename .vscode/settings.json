@@ -15,6 +15,7 @@
         "GOPATH",
         "goreleaser",
         "infile",
+        "jsontext",
         "keymap",
         "leodido",
         "lipgloss",

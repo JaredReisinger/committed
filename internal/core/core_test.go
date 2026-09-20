@@ -15,7 +15,7 @@ func TestRun(t *testing.T) {
 
 	tmpFile := createTempFile(t, `feat: simple feature`)
 
-	err := Run([]string{tmpFile}, false)
+	err := Run([]string{tmpFile}, false, "")
 	assert.NoError(t, err)
 }
 

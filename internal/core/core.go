@@ -2,6 +2,8 @@ package core
 
 import (
 	"fmt"
+	"log/slog"
+	"os"
 
 	"github.com/pkg/errors"
 
@@ -13,7 +15,23 @@ import (
 
 var testBypass = false
 
-func Run(args []string, dryRun bool) error {
+func Run(args []string, dryRun bool, logFile string) error {
+	var logger *slog.Logger
+	if logFile != "" {
+		file, err := os.Create(logFile)
+		if err != nil {
+			return err
+		}
+		logger = slog.New(slog.NewJSONHandler(file, &slog.HandlerOptions{
+			Level: slog.LevelDebug,
+		}))
+	} else {
+		logger = slog.New(slog.DiscardHandler)
+	}
+	slog.SetDefault(logger)
+
+	slog.Info("logging initialized", "file", logFile)
+
 	file, _, _, err := hook.ExtractArgs(args, dryRun)
 	if err != nil {
 		return errors.WithMessage(err, "error parsing hook arguments")

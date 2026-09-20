@@ -3,6 +3,7 @@ package hook
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 )
 
@@ -31,6 +32,8 @@ func ExtractArgs(args []string, dryRun bool) (file string, source string, ref st
 	case 0:
 		// no-op
 	}
+
+	slog.Debug("extracted args", "count", c, "msgFile", file, "msgSource", source, "ref", ref)
 
 	return
 }
