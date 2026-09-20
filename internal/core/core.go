@@ -65,13 +65,14 @@ func Run(args []string, dryRun bool, logFile string) error {
 		}
 	}
 
+	formattedMessage := msg.Format(cfg)
 	if !dryRun {
-		err = hook.WriteMessageFile(file, msg.String())
+		err = hook.WriteMessageFile(file, formattedMessage)
 		if err != nil {
 			return errors.WithMessage(err, "error writing commit message")
 		}
 	} else {
-		fmt.Printf("DRY-RUN: committed would have written:\n---\n%s---\n", msg.String())
+		fmt.Printf("DRY-RUN: committed would have written:\n---\n%s---\n", formattedMessage)
 	}
 
 	return nil

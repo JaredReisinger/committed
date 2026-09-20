@@ -31,10 +31,5 @@ func DefaultConfig() *Config {
 		SubjectMaxLength:  100,
 		BodyMaxLineLength: 100,
 		HeaderMaxLength:   100,
-
-		// // test values...
-		// SubjectMaxLength:  50,
-		// BodyMaxLineLength: 50,
-		// HeaderMaxLength:   50,
 	}
 }

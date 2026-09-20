@@ -34,5 +34,5 @@ func TestRun(t *testing.T) {
 
 	msg, err := Run(cfg, nil)
 	assert.NoError(t, err)
-	assert.Equal(t, "", msg.String())
+	assert.Equal(t, "", msg.Format(cfg))
 }

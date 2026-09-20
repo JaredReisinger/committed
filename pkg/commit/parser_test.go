@@ -4,7 +4,10 @@ import (
 	"testing"
 
 	"github.com/go-openapi/testify/v2/assert"
+	"github.com/jaredreisinger/committed/pkg/config"
 )
+
+var cfg = config.DefaultConfig()
 
 func TestParseMessage_ValidConventional(t *testing.T) {
 	input := "feat(api): add user authentication\n\n- Add JWT token validation\n- Implement login endpoint\n\nCloses: #123"
@@ -81,7 +84,7 @@ func TestMessage_String(t *testing.T) {
 	}
 
 	expected := "feat(api): add user auth\n\nSome details here\n\nCloses: #123\n"
-	actual := msg.String()
+	actual := msg.Format(cfg)
 
 	assert.Equal(t, expected, actual)
 }
