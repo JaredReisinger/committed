@@ -4,5 +4,6 @@
 .task
 .dist/
 
-# ignore temp MSG file...
-MSG
+# ignore temp files...
+.log.json
+TODO.md
