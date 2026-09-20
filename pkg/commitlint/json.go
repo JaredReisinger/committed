@@ -1,7 +1,8 @@
 package commitlint
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"errors"
 	"log/slog"
 )
@@ -11,7 +12,7 @@ func (v *RuleValue[valType]) UnmarshalJSON(data []byte) error {
 	slog.Debug("parsing rule values", "type", "JSON", "data", string(data))
 
 	// incoming is an array...
-	var tmp []json.RawMessage
+	var tmp []jsontext.Value
 
 	err := json.Unmarshal(data, &tmp)
 	if err != nil {
