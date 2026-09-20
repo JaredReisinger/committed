@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	"github.com/go-openapi/testify/v2/assert"
-	"github.com/jaredreisinger/committed/internal/config"
 	"github.com/jaredreisinger/committed/pkg/commit"
+	"github.com/jaredreisinger/committed/pkg/config"
 )
 
 func TestNewModel(t *testing.T) {

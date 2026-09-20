@@ -9,8 +9,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
-	"github.com/jaredreisinger/committed/internal/config"
 	"github.com/jaredreisinger/committed/pkg/commit"
+	"github.com/jaredreisinger/committed/pkg/config"
 	"github.com/jaredreisinger/committed/pkg/teautil"
 )
 

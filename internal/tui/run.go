@@ -5,8 +5,8 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/jaredreisinger/committed/internal/config"
 	"github.com/jaredreisinger/committed/pkg/commit"
+	"github.com/jaredreisinger/committed/pkg/config"
 )
 
 var testHookProgram *tea.Program
