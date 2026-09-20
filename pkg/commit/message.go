@@ -132,6 +132,8 @@ func wrap(s string, limit int) string {
 	var lastSpace rune
 	lastSpaceLen := 0
 
+	slog.Debug("wrap: wrapping text", "input", s, "limit", limit)
+
 	for _, c := range s {
 		if unicode.IsSpace(c) {
 			// if the current word *does* fit on the line, include the last
@@ -139,6 +141,7 @@ func wrap(s string, limit int) string {
 			// newlines!)
 			fits := line.Len()+lastSpaceLen+word.Len() < limit
 			if fits {
+				slog.Debug("wrap: fits, adding word to line", "line", line.String(), "word", word.String(), "limit", limit)
 				if lastSpaceLen > 0 {
 					line.WriteRune(lastSpace)
 				}
@@ -149,12 +152,19 @@ func wrap(s string, limit int) string {
 			}
 
 			// If it didn't fit, *or* if this was a newline, go ahead and send
-			// the line to the output builder.
+			// the line to the output builder and start a new line with the word.
 			if !fits || c == '\n' {
+				slog.Debug("wrap: no fit or newline, adding line to output", "line", line.String(), "word", word.String(), "limit", limit)
 				out.WriteString(line.String())
 				out.WriteRune('\n')
 				line.Reset()
-				lastSpaceLen = 0
+
+				if word.Len() > 0 {
+					line.WriteString(word.String())
+					word.Reset()
+				} else {
+					lastSpaceLen = 0
+				}
 			}
 		} else {
 			word.WriteRune(c)
@@ -163,8 +173,10 @@ func wrap(s string, limit int) string {
 
 	// and a final check for any trailing word/line...
 	if word.Len() > 0 || line.Len() > 0 {
+		slog.Debug("wrap: end of input", "line", line.String(), "word", word.String())
 		fits := line.Len()+lastSpaceLen+word.Len() < limit
 		if fits {
+			slog.Debug("wrap: fits, adding word to line", "line", line.String(), "word", word.String(), "limit", limit)
 			if lastSpaceLen > 0 {
 				line.WriteRune(lastSpace)
 			}
@@ -173,10 +185,12 @@ func wrap(s string, limit int) string {
 		}
 
 		if line.Len() > 0 {
+			slog.Debug("wrap: adding final line", "line", line.String())
 			out.WriteString(line.String())
 		}
 
 		if word.Len() > 0 {
+			slog.Debug("wrap: adding final word", "word", word.String())
 			out.WriteRune('\n')
 			out.WriteString(word.String())
 		}

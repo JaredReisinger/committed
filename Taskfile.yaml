@@ -39,7 +39,7 @@ tasks:
       COV_FILE: '{{.COV_DIR}}/coverage.out'
     cmds:
       - mkdir -p {{.COV_DIR}}
-      - go test ./... -coverprofile={{.COV_FILE}}
+      - go test ./... -coverprofile={{.COV_FILE}} {{.CLI_ARGS}}
       - go tool cover -html={{.COV_FILE}} -o {{.COV_DIR}}/coverage.html
       - go tool gcov2lcov -infile {{.COV_FILE}} -outfile {{.COV_DIR}}/lcov.info
 

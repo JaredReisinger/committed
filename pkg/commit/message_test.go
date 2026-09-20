@@ -2,10 +2,18 @@ package commit
 
 import (
 	"fmt"
+	"log/slog"
+	"os"
 	"testing"
 
 	"github.com/go-openapi/testify/v2/assert"
 )
+
+func init() {
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	})))
+}
 
 func TestWrap(t *testing.T) {
 	for i, tt := range []struct {
@@ -18,10 +26,13 @@ func TestWrap(t *testing.T) {
 		{"lorem\nipsum", 20, "lorem\nipsum"},
 		{"lorem\n ipsum", 20, "lorem\n ipsum"},
 		{"this\n  - item 1\n  - item2", 20, "this\n  - item 1\n  - item2"},
-		{"lorem ipsum_but_way_too_long", 10, "lorem\nipsum_but_way_too_long"},
 		// nice-ish handling of sentence separating whitespace
 		{"end.  start", 10, "end. \nstart"},
 		{"", 20, ""},
+		// weird wrapping edge cases
+		{"lorem ipsum_but_way_too_long", 10, "lorem\nipsum_but_way_too_long"},
+		{"lorem ipsum_but_way_too_long lorem", 10, "lorem\nipsum_but_way_too_long\nlorem"},
+		{"lorem ipsum_but_way_too_long lorem foo", 10, "lorem\nipsum_but_way_too_long\nlorem foo"},
 	} {
 		t.Run(fmt.Sprintf("case %d", i+1), func(t *testing.T) {
 			t.Parallel()
