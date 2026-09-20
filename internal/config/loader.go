@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/jaredreisinger/committed/internal/config/commitlint"
+	"github.com/jaredreisinger/committed/pkg/commitlint"
 	"gopkg.in/yaml.v3"
 )
 
