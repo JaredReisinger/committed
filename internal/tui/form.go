@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"charm.land/bubbles/v2/help"
@@ -20,6 +21,7 @@ type field int
 const (
 	// this is also the tab order
 	typeField field = iota
+	typeList
 	scopeField
 	descriptionField
 	bodyField
@@ -38,12 +40,11 @@ type mainForm struct {
 	config       *config.Config
 	existingMsg  *commit.Message // just for init, don't persist
 	focusedField field
-	texts        teautil.Router[field, textModel]
+	children     teautil.Router[field, tea.Model]
 	// textinputs    teautil.Router[field, textinputModel]
 	// textareas     teautil.Router[field, textareaModel]
 	bodyMaxHeight int
 	help          help.Model
-	typeIndex     int // for navigating type enum
 	err           error
 	log           string
 }
@@ -58,6 +59,8 @@ func newModel(cfg *config.Config, existingMsg *commit.Message) mainForm {
 	var initialBody string
 	var initialFooter string
 
+	// Do we really want to set initial values here, or is Init() better for
+	// that?
 	if existingMsg != nil {
 		initialType = existingMsg.Type
 		initialScope = existingMsg.Scope
@@ -69,13 +72,14 @@ func newModel(cfg *config.Config, existingMsg *commit.Message) mainForm {
 	help.ShowAll = true
 	help.SetWidth(80)
 
-	m := mainForm{
+	form := mainForm{
 		config:       cfg,
 		existingMsg:  existingMsg,
-		focusedField: typeField,
+		focusedField: typeList,
 
-		texts: teautil.NewRouter(map[field]textModel{
+		children: teautil.NewRouter(map[field]tea.Model{
 			typeField:        newTextModel(false, "type", initialType),
+			typeList:         newListModel(cfg.Types),
 			scopeField:       newTextModel(false, "scope", initialScope),
 			descriptionField: newTextModel(false, "description", initialDesc),
 			bodyField:        newTextModel(true, "message body", initialBody),
@@ -83,8 +87,6 @@ func newModel(cfg *config.Config, existingMsg *commit.Message) mainForm {
 		}),
 
 		help: help,
-
-		typeIndex: 0, // ?
 	}
 
 	// // TODO: this should happen in Init!
@@ -94,7 +96,7 @@ func newModel(cfg *config.Config, existingMsg *commit.Message) mainForm {
 	// 	m = m.populateFromExisting()
 	// }
 
-	return m
+	return form
 }
 
 func maxTypeLength(cfg *config.Config) int {
@@ -119,7 +121,6 @@ func maxTypeLength(cfg *config.Config) int {
 // 	// 	// Find the type in our config enum
 // 	// 	for i, t := range m.config.Types {
 // 	// 		if t == m.existingMsg.Type {
-// 	// 			m.typeIndex = i
 // 	// 			typ := m.textareas.MustGet(typeField)
 // 	// 			typ.SetValue(t)
 // 	// 			typ.MoveToBegin()
@@ -151,7 +152,7 @@ func (form mainForm) Init() tea.Cmd {
 	// should other processing happen here?
 	// return textinput.Blink
 	// Set initial focus
-	return setFocusCmd(typeField)
+	return setFocusCmd(typeList)
 }
 
 type setFocusMsg struct {
@@ -159,7 +160,9 @@ type setFocusMsg struct {
 }
 
 func setFocusCmd(f field) tea.Cmd {
+	slog.Debug("queueing setFocus", "field", f)
 	return func() tea.Msg {
+		slog.Debug("message setFocus", "field", f)
 		return setFocusMsg{field: f}
 	}
 }
@@ -180,9 +183,27 @@ func (form mainForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		form = form.resize(msgT.Width, msgT.Height)
 		handled = true
 	case setFocusMsg:
+		slog.Debug("actual setFocus", "field", msgT.field)
 		form, cmd = form.setFocus(msgT.field)
 		cmds = append(cmds, cmd)
+		handled = true
+	case teautil.WrappedMsg[field]:
+		if msgT.Key == typeList {
+			listMsg, ok := msgT.Msg.(listSelectionChangedMsg)
+			if ok {
+				slog.Debug("saw listSelectionChangedMsg")
+				t2 := form.children.MustGet(typeField).(textModel).SetValue(listMsg.selectedItem).MoveToEnd()
+				form.children = form.children.Set(typeField, t2)
+				handled = true
+			}
+		}
 	case tea.KeyPressMsg:
+		// REVIEW.... should we check the focus field for handling first?  I
+		// have to think really hard about the order key messages should happen
+		// in.  I think that perhaps it's (1) app-level focus/submit, (2)
+		// field-level handling/typing.  This is kind of what's happening now,
+		// so maybe it's fine.  But the keymap is conflated, and perhaps should
+		// not be.
 		handled = true // assume handled, set back to false in default case
 		switch {
 		case key.Matches(msgT, defaultKeyMap.Cancel):
@@ -221,24 +242,6 @@ func (form mainForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// 		m.nextField()
 		// 	}
 
-		// case tea.KeyMsg:
-		// 	switch msg.String() {
-
-		// 	case "up", "down":
-		// 		if m.focusedField == typeField {
-		// 			if msg.String() == "up" {
-		// 				if m.typeIndex > 0 {
-		// 					m.typeIndex--
-		// 				}
-		// 			} else {
-		// 				if m.typeIndex < len(m.config.Types)-1 {
-		// 					m.typeIndex++
-		// 				}
-		// 			}
-		// 			return m, nil
-		// 		}
-		// 	}
-
 		// case teautil.WrappedMsg[int]:
 		// 	// forward the message to the appropriate model...
 		// 	targetModel = field(msgT.Key)
@@ -249,19 +252,27 @@ func (form mainForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// delegate other messages to the field/model with focus...
 	if !handled {
 		var cmd tea.Cmd
-		form.texts, cmd = form.texts.Update(msg, form.focusedField)
+
+		// if form.focusedField == typeField {
+		// 	var typeList tea.Model
+		// 	typeList, cmd = form.typeList.Update(msg)
+		// 	form.typeList = typeList.(listModel)
+		// } else {
+		form.children, cmd = form.children.Update(msg, form.focusedField)
+		// }
+
 		// m.textareas, cmd = m.textareas.Update(msg, targetModel)
 		cmds = append(cmds, cmd)
 
 		// If the focused field is the body, check for dynamic->fixed size
 		// changing
 		if form.focusedField == bodyField {
-			body := form.texts.MustGet(bodyField)
+			body := form.children.MustGet(bodyField).(textModel)
 			if body.DynamicHeight() && body.Height() >= form.bodyMaxHeight {
 				body = body.SetDynamicHeight(false)
 				body = body.SetMaxHeight(0)
 				body = body.SetHeight(form.bodyMaxHeight)
-				form.texts = form.texts.Set(bodyField, body)
+				form.children = form.children.Set(bodyField, body)
 			}
 		}
 	}
@@ -274,20 +285,22 @@ func (form mainForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return form, tea.Batch(cmds...)
 }
 
-func (form mainForm) resize(width int, height int) mainForm {
-	form.log = fmt.Sprintf("%dx%d", width, height)
+func (form mainForm) resize(winWidth int, winHeight int) mainForm {
+	form.log = fmt.Sprintf("%dx%d", winWidth, winHeight)
 
 	// We're going to manage the field borders separate from the text controls
 	// because textarea has some rendering challenges with doubling borders with
 	// an empty field.  For now, we're calc'ing 2x and 2y for borders...
-	// bw := 2
-	bh := 2
 
-	typ := form.texts.MustGet(typeField)
-	scope := form.texts.MustGet(scopeField)
-	desc := form.texts.MustGet(descriptionField)
-	body := form.texts.MustGet(bodyField)
-	footer := form.texts.MustGet(footerField)
+	// bw := 2 // border width?
+	bh := 2 // border height?
+
+	typ := form.children.MustGet(typeField).(textModel)
+	// TODO: size typeList field here as well!
+	scope := form.children.MustGet(scopeField).(textModel)
+	desc := form.children.MustGet(descriptionField).(textModel)
+	body := form.children.MustGet(bodyField).(textModel)
+	footer := form.children.MustGet(footerField).(textModel)
 
 	cfg := form.config
 
@@ -299,12 +312,12 @@ func (form mainForm) resize(width int, height int) mainForm {
 
 	descLimit := min(cfg.SubjectMaxLength, cfg.HeaderMaxLength-maxTyp)
 	desc = desc.SetCharLimit(descLimit)
-	desc = desc.SetWidth(min(descLimit+1, width-typ.Width())) // +1 for cursor
+	desc = desc.SetWidth(min(descLimit+1, winWidth-typ.Width())) // +1 for cursor
 
-	body = body.SetWidth(min(cfg.BodyMaxLineLength, width))
+	body = body.SetWidth(min(cfg.BodyMaxLineLength, winWidth))
 	helpHeight := 8
 	logHeight := 1
-	form.bodyMaxHeight = height - typ.Height() - bh - bh - helpHeight - logHeight - 1
+	form.bodyMaxHeight = winHeight - typ.Height() - bh - bh - helpHeight - logHeight - 1
 	body = body.SetMaxHeight(form.bodyMaxHeight)
 
 	if body.DynamicHeight() && body.Height() >= form.bodyMaxHeight {
@@ -312,14 +325,18 @@ func (form mainForm) resize(width int, height int) mainForm {
 		body = body.SetMaxHeight(0)
 		body = body.SetHeight(form.bodyMaxHeight)
 	}
+
 	// it would be nice to switch back to dynamic if the content shrinks, but
 	// there's no easy way to get "how many visual lines are needed?"
+	//
+	// TODO: maybe get the text, run it through our wrapping helper, and then
+	// use that for the height?
 
-	footer = footer.SetWidth(min(cfg.BodyMaxLineLength, width))
+	footer = footer.SetWidth(min(cfg.BodyMaxLineLength, winWidth))
 
-	form.help.SetWidth(width)
+	form.help.SetWidth(winWidth)
 
-	form.texts = form.texts.SetMap(map[field]textModel{
+	form.children = form.children.SetMap(map[field]tea.Model{
 		typeField:        typ,
 		scopeField:       scope,
 		descriptionField: desc,
@@ -330,36 +347,53 @@ func (form mainForm) resize(width int, height int) mainForm {
 	return form
 }
 
+type Focuser interface {
+	Focus() (tea.Model, tea.Cmd)
+	Blur() (tea.Model, tea.Cmd)
+}
+
 // updateFocus updates which field is currently focused.
 func (form mainForm) setFocus(focusField field) (mainForm, tea.Cmd) {
-	modelMap := map[field]textModel{}
+	modelMap := map[field]tea.Model{}
 	var cmds []tea.Cmd
-	var t2 textModel
 	var cmd tea.Cmd
 
 	// instead of a full loop, we could just blur the previous field!
 	for f := range maxField {
-		if t, ok := form.texts.Get(f); ok {
-			if f == focusField {
-				t2, cmd = t.Focus()
-			} else {
-				t2, cmd = t.Blur()
+		if child, ok := form.children.Get(f); ok {
+			c2 := child
+			// // This is okay, but I think I really want to update the value *as*
+			// // the selection changes...
+			// if f == typeField && form.focusedField == typeField {
+			// 	c2 = c2.SetValue(form.config.Types[form.typeList.getSelectedIndex()]).MoveToEnd()
+			// }
+
+			focuser, ok := c2.(Focuser)
+			if ok {
+				if f == focusField {
+					c2, cmd = focuser.Focus()
+				} else {
+					c2, cmd = focuser.Blur()
+				}
 			}
-			modelMap[f] = t2
+
+			modelMap[f] = c2
 			cmds = append(cmds, teautil.Wrap(cmd, f))
 		}
 	}
-	form.texts = form.texts.SetMap(modelMap)
+	form.children = form.children.SetMap(modelMap)
 	form.focusedField = focusField
 
 	// NOTE: defaultKeyMap is a global, which isn't really the Elm Architecture
 	// way...
-	if form.texts.MustGet(form.focusedField).isArea {
-		defaultKeyMap.NextSingle.SetEnabled(false)
-		defaultKeyMap.NextMulti.SetEnabled(true)
-	} else {
-		defaultKeyMap.NextSingle.SetEnabled(true)
-		defaultKeyMap.NextMulti.SetEnabled(false)
+	if form.focusedField != typeList {
+		if form.children.MustGet(form.focusedField).(textModel).isArea {
+			defaultKeyMap.NextSingle.SetEnabled(false)
+			defaultKeyMap.NextMulti.SetEnabled(true)
+		} else {
+			defaultKeyMap.NextSingle.SetEnabled(true)
+			defaultKeyMap.NextMulti.SetEnabled(false)
+		}
 	}
 
 	return form, tea.Batch(cmds...)
@@ -367,7 +401,7 @@ func (form mainForm) setFocus(focusField field) (mainForm, tea.Cmd) {
 
 // nextField moves to the next field.
 func (form mainForm) nextField() tea.Cmd {
-	return setFocusCmd((form.focusedField + 1) % maxField)
+	return setFocusCmd(max((form.focusedField+1)%maxField, typeList))
 }
 
 // prevField moves to the previous field.
@@ -387,14 +421,22 @@ func (form mainForm) validateDescription() error {
 	return nil
 }
 
+type KeyBinder interface {
+	GetKeyBindings() []key.Binding
+}
+
 // View renders the TUI.
 func (form mainForm) View() tea.View {
-	renders := make(map[field]string, form.texts.Len())
+	renders := make(map[field]string, form.children.Len())
 
-	for f, t := range form.texts.All() {
+	for f, child := range form.children.All() {
+		if f == typeList {
+			continue
+		}
 		focused := f == form.focusedField
 		decoration := blurSingle
-		if !t.isArea {
+		// We should have an interface that returns the decoration needs?
+		if !child.(textModel).isArea {
 			if focused {
 				decoration = focusSingle
 			}
@@ -405,22 +447,26 @@ func (form mainForm) View() tea.View {
 				decoration = blurArea
 			}
 		}
-		renders[f] = decoration.Render(t.View().Content)
+		renders[f] = decoration.Render(child.View().Content)
 	}
 
 	// get the focused field key bindings...
-	textKeyBindings := form.texts.MustGet(form.focusedField).GetKeyBindings()
+	var keyBindings []key.Binding
+	keyBinder, ok := form.children.MustGet(form.focusedField).(KeyBinder)
+	if ok {
+		keyBindings = keyBinder.GetKeyBindings()
+	}
 
 	// It seems ridiculous to recalculate the keymap on every single view, but
 	// with an immutable pattern, we *can't* know if we have the same value call
 	// after call. On the plus side, this should be a very fast calculation (and
 	// maybe we can memoize the values and keep a pre-rendered view?)
-	helpKeys := buildHelpKeys(textKeyBindings)
+	helpKeys := buildHelpKeys(keyBindings)
 
 	// TODO: use lipgloss.NewLayer() and compositor.Compose() to handle z-depth
 	// rendering?
 
-	view := lipgloss.JoinVertical(
+	mainView := lipgloss.JoinVertical(
 		lipgloss.Left,
 		"\n",
 		lipgloss.JoinHorizontal(
@@ -445,7 +491,19 @@ func (form mainForm) View() tea.View {
 		// ),
 	)
 
-	return tea.NewView(view)
+	layers := []*lipgloss.Layer{
+		lipgloss.NewLayer(mainView),
+	}
+
+	if form.focusedField == typeField || form.focusedField == typeList {
+		// typeView := strings.Join(form.config.Types, "\n")
+		typeView := form.children.MustGet(typeList).View()
+		layers = append(layers, lipgloss.NewLayer(typeView.Content).X(10).Y(2))
+	}
+
+	comp := lipgloss.NewCompositor(layers...)
+
+	return tea.NewView(comp.Render())
 
 }
 
@@ -455,10 +513,13 @@ func (form mainForm) Result() (*commit.Message, error) {
 		return nil, form.err
 	}
 
-	texts := make(map[field]string, form.texts.Len())
+	texts := make(map[field]string, form.children.Len())
 
-	for f, t := range form.texts.All() {
-		texts[f] = strings.TrimSpace(t.Value())
+	for f, t := range form.children.All() {
+		if f == typeList {
+			continue
+		}
+		texts[f] = strings.TrimSpace(t.(textModel).Value())
 	}
 
 	// if !m.done {
@@ -471,10 +532,6 @@ func (form mainForm) Result() (*commit.Message, error) {
 		Body:        texts[bodyField],
 		Footer:      texts[footerField],
 	}
-
-	// if len(m.config.Types) > 0 && m.typeIndex >= 0 && m.typeIndex < len(m.config.Types) {
-	// 	msg.Type = m.config.Types[m.typeIndex]
-	// }
 
 	return msg, nil
 }

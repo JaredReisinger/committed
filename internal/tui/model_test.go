@@ -13,7 +13,7 @@ func TestNewModel(t *testing.T) {
 	m := newModel(cfg, nil)
 
 	assert.NotNil(t, m.config)
-	assert.Equal(t, typeField, m.focusedField)
+	assert.Equal(t, typeList, m.focusedField)
 	assert.NotEmpty(t, m.config.Types)
 }
 
@@ -29,10 +29,11 @@ func TestNewModel_WithExistingMessage(t *testing.T) {
 
 	m := newModel(cfg, existing)
 
-	desc := m.texts.MustGet(descriptionField)
-	body := m.texts.MustGet(bodyField)
+	typ := m.children.MustGet(typeField).(textModel)
+	desc := m.children.MustGet(descriptionField).(textModel)
+	body := m.children.MustGet(bodyField).(textModel)
 
-	assert.Equal(t, 0, m.typeIndex)
+	assert.Equal(t, "feat", typ.Value())
 	assert.Equal(t, "add new feature", desc.Value())
 	assert.Equal(t, "detailed description", body.Value())
 }
@@ -43,7 +44,7 @@ func TestValidateDescription(t *testing.T) {
 	cfg := &config.Config{SubjectMaxLength: 50}
 	m := newModel(cfg, nil)
 
-	desc := m.texts.MustGet(descriptionField)
+	desc := m.children.MustGet(descriptionField).(textModel)
 
 	// Empty description should fail
 	desc.SetValue("")

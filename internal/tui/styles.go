@@ -28,17 +28,22 @@ var (
 
 	// focusedTextStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("250"))
 
-	placeholderStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("238")).
-				Italic(true)
+	decorationFocusColor = lipgloss.Color("201")
+	decorationBlurColor  = lipgloss.Color("238")
+
+	textPlaceholderColor = lipgloss.Color("238")
+	textBlurColor        = lipgloss.Color("244")
+	textFocusColor       = lipgloss.Color("250")
+
+	placeholderStyle = lipgloss.NewStyle().Foreground(textPlaceholderColor).Italic(true)
 
 	defaultTextStyles = textStyles{
 		Focused: textPartStyles{
-			Text:        lipgloss.NewStyle().Foreground(lipgloss.Color("250")),
+			Text:        lipgloss.NewStyle().Foreground(textFocusColor),
 			Placeholder: placeholderStyle,
 		},
 		Blurred: textPartStyles{
-			Text:        lipgloss.NewStyle().Foreground(lipgloss.Color("244")),
+			Text:        lipgloss.NewStyle().Foreground(textBlurColor),
 			Placeholder: placeholderStyle,
 		},
 		Cursor: textCursorStyle{
@@ -52,11 +57,8 @@ var (
 	areaDecoration = lipgloss.NewStyle().
 			Border(lipgloss.NormalBorder(), true, true, true, true)
 
-	focusColor = lipgloss.Color("201")
-	blurColor  = lipgloss.Color("238")
-
-	focusSingle = singleDecoration.BorderForeground(focusColor)
-	blurSingle  = singleDecoration.BorderForeground(blurColor)
-	focusArea   = areaDecoration.BorderForeground(focusColor)
-	blurArea    = areaDecoration.BorderForeground(blurColor)
+	focusSingle = singleDecoration.BorderForeground(decorationFocusColor)
+	blurSingle  = singleDecoration.BorderForeground(decorationBlurColor)
+	focusArea   = areaDecoration.BorderForeground(decorationFocusColor)
+	blurArea    = areaDecoration.BorderForeground(decorationBlurColor)
 )

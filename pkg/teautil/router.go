@@ -168,13 +168,14 @@ func (r Router[K, M]) UpdateAll(msg tea.Msg) (Router[K, M], tea.Cmd) {
 func (r Router[K, M]) update(msg tea.Msg, keys iter.Seq[K]) (Router[K, M], tea.Cmd) {
 	var cmds []tea.Cmd
 
+	rr := r.clone()
 	for k := range keys {
 		updatedChildModel, cmd := r.models[k].Update(msg)
-		r.models[k] = updatedChildModel.(M)
+		rr.models[k] = updatedChildModel.(M)
 		cmds = append(cmds, Wrap(cmd, k))
 	}
 
-	return r, tea.Batch(cmds...)
+	return rr, tea.Batch(cmds...)
 }
 
 func singleSeq[K comparable](key K) iter.Seq[K] {

@@ -385,7 +385,7 @@ func (t textModel) SetCharLimit(width int) textModel {
 	return t2
 }
 
-func (t textModel) Focus() (textModel, tea.Cmd) {
+func (t textModel) Focus() (tea.Model, tea.Cmd) {
 	t2 := t.clone()
 	var cmd tea.Cmd
 
@@ -398,7 +398,7 @@ func (t textModel) Focus() (textModel, tea.Cmd) {
 	return t2, cmd
 }
 
-func (t textModel) Blur() (textModel, tea.Cmd) {
+func (t textModel) Blur() (tea.Model, tea.Cmd) {
 	t2 := t.clone()
 	var cmd tea.Cmd
 
