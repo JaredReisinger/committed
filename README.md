@@ -11,6 +11,8 @@ grade](https://img.shields.io/codacy/grade/f9e05f25d82e4c5d8b5421b54b49af38?logo
 
 A bubbletea-powered text UI that integrates as a proper `commit-msg` hook for conventional commits.
 
+![screenshot](./docs/screenshot.png)
+
 ## Installation
 
 Either grab the binary appropriate to your platform from the [Releases](https://github.com/JaredReisinger/committed/releases) page, or install directly from Go:
