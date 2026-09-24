@@ -422,27 +422,52 @@ type KeyBinder interface {
 
 // View renders the TUI.
 func (form mainForm) View() tea.View {
-	renders := make(map[field]string, form.children.Len())
+	// the view content might be the value, it might be a placeholder, and it
+	// includes padding
+	views := make(map[field]string, form.children.Len())
 
 	for f, child := range form.children.All() {
-		if f == typeList {
-			continue
+		views[f] = child.View().Content
+	}
+
+	// the renders are the decorated versions of the fields
+	renders := make(map[field]string, form.children.Len())
+
+	// I would *love* to combine borders in some cases... it would make the
+	// while-being-edited form look much more like the final output.
+	for f, child := range form.children.All() {
+		var childState state = blurred
+		var childStatus status = defaultStatus
+		var childKind fieldKind = single
+		if f == form.focusedField {
+			childState = focused
 		}
-		focused := f == form.focusedField
-		decoration := blurSingle
-		// We should have an interface that returns the decoration needs?
-		if !child.(textModel).isArea {
-			if focused {
-				decoration = focusSingle
+		// TODO: make an interface for styling single/multi...
+		if f == typeList || child.(textModel).isArea {
+			childKind = multi
+		}
+
+		border := kindDecorations[childKind].BorderForeground(defaultColors[childStatus][childState][decoration])
+
+		switch f {
+		case typeField, scopeField, descriptionField:
+			if form.focusedField >= bodyField {
+				border = border.UnsetBorderBottom()
 			}
-		} else {
-			if focused {
-				decoration = focusArea
-			} else {
-				decoration = blurArea
+		case bodyField:
+			if form.focusedField < bodyField {
+				border = border.UnsetBorderTop()
+			}
+			if form.focusedField == footerField {
+				border = border.UnsetBorderBottom()
+			}
+		case footerField:
+			if form.focusedField < footerField {
+				border = border.UnsetBorderTop()
 			}
 		}
-		renders[f] = decoration.Render(child.View().Content)
+
+		renders[f] = border.Render(views[f])
 	}
 
 	// get the focused field key bindings...
@@ -458,32 +483,36 @@ func (form mainForm) View() tea.View {
 	// maybe we can memoize the values and keep a pre-rendered view?)
 	helpKeys := buildHelpKeys(keyBindings)
 
-	// TODO: use lipgloss.NewLayer() and compositor.Compose() to handle z-depth
-	// rendering?
+	// For the top line, we omit unused scope unless it has focus
+	showScope := form.focusedField == scopeField || form.children.MustGet(scopeField).(textModel).Value() != ""
+	header := lipgloss.JoinHorizontal(
+		lipgloss.Top,
+		" ", // one space to align body left border
+		renders[typeField],
+	)
+	if showScope {
+		header = lipgloss.JoinHorizontal(
+			lipgloss.Top,
+			header,
+			"(",
+			renders[scopeField],
+			")",
+		)
+	}
+	header = lipgloss.JoinHorizontal(
+		lipgloss.Top,
+		header,
+		": ",
+		renders[descriptionField],
+	)
 
 	mainView := lipgloss.JoinVertical(
 		lipgloss.Left,
 		"\n",
-		lipgloss.JoinHorizontal(
-			lipgloss.Top,
-			renders[typeField],
-			"(",
-			renders[scopeField],
-			"): ",
-			renders[descriptionField],
-		),
+		header,
 		renders[bodyField],
 		renders[footerField],
 		form.help.View(helpKeys), // &defaultKeyMap),
-
-		// // debug config info
-		// fmt.Sprintf(
-		// 	"header=%d, subject=%d, body=%d, log=%s",
-		// 	m.config.HeaderMaxLength,
-		// 	m.config.SubjectMaxLength,
-		// 	m.config.BodyMaxLineLength,
-		// 	m.log,
-		// ),
 	)
 
 	layers := []*lipgloss.Layer{
@@ -491,9 +520,7 @@ func (form mainForm) View() tea.View {
 	}
 
 	if form.focusedField == typeField || form.focusedField == typeList {
-		// typeView := strings.Join(form.config.Types, "\n")
-		typeView := form.children.MustGet(typeList).View()
-		layers = append(layers, lipgloss.NewLayer(typeView.Content).X(10).Y(2))
+		layers = append(layers, lipgloss.NewLayer(renders[typeList]).X(10).Y(1))
 	}
 
 	comp := lipgloss.NewCompositor(layers...)

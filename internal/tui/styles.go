@@ -106,13 +106,6 @@ var (
 		// MiddleBottom: " ",
 	}
 
-	// bodyBorder =
-
-	// focusedTextStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("250"))
-
-	decorationFocusColor = defaultColors[defaultStatus][focused][decoration]
-	decorationBlurColor  = defaultColors[defaultStatus][blurred][decoration]
-
 	placeholderStyle = lipgloss.NewStyle().Foreground(defaultColors[defaultStatus][focused][placeholder]).Italic(true)
 
 	defaultTextStyles = textStyles{
@@ -135,8 +128,41 @@ var (
 	areaDecoration = lipgloss.NewStyle().
 			Border(lipgloss.NormalBorder(), true, true, true, true)
 
-	focusSingle = singleDecoration.BorderForeground(decorationFocusColor)
-	blurSingle  = singleDecoration.BorderForeground(decorationBlurColor)
-	focusArea   = areaDecoration.BorderForeground(decorationFocusColor)
-	blurArea    = areaDecoration.BorderForeground(decorationBlurColor)
+	focusSingle = singleDecoration.BorderForeground(defaultColors[defaultStatus][focused][decoration])
+	blurSingle  = singleDecoration.BorderForeground(defaultColors[defaultStatus][blurred][decoration])
+	focusArea   = areaDecoration.BorderForeground(defaultColors[defaultStatus][focused][decoration])
+	blurArea    = areaDecoration.BorderForeground(defaultColors[defaultStatus][blurred][decoration])
+)
+
+// For decorations, I really wanted to handle "auto-merging" top/bottom borders,
+// but it's conflated enough that I think it has to be handled in View() itself,
+// to turn specific borders on/off.  Here, we just define the "in isolation"
+// variant of the decoration.
+
+type fieldKind int
+
+const (
+	single fieldKind = iota
+	multi
+)
+
+var (
+	kindDecorations = map[fieldKind]lipgloss.Style{
+		single: lipgloss.NewStyle().Border(underBorder, false, false, true, false),
+		multi:  lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true, true, true, true),
+	}
+
+	// // do we need to pre-define these, or build them on the fly?
+	// defaultDecorations = map[status]map[state]map[fieldKind]lipgloss.Style{
+	// 	defaultStatus: {
+	// 		blurred: {
+	// 			single: kindDecorations[single].BorderForeground(defaultColors[defaultStatus][blurred][decoration]),
+	// 			multi:  kindDecorations[multi].BorderForeground(defaultColors[defaultStatus][blurred][decoration]),
+	// 		},
+	// 		focused: {
+	// 			single: kindDecorations[single].BorderForeground(defaultColors[defaultStatus][focused][decoration]),
+	// 			multi:  kindDecorations[multi].BorderForeground(defaultColors[defaultStatus][focused][decoration]),
+	// 		},
+	// 	},
+	// }
 )
