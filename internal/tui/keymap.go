@@ -41,7 +41,7 @@ var defaultKeyMap = keyMap{
 
 	Submit: key.NewBinding(
 		key.WithKeys("ctrl+enter"),
-		key.WithHelp("ctrl+enter", ""),
+		key.WithHelp("ctrl+enter", "submit message"),
 	),
 }
 
