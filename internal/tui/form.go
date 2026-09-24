@@ -2,7 +2,6 @@ package tui
 
 import (
 	"fmt"
-	"log/slog"
 	"strings"
 
 	"charm.land/bubbles/v2/help"
@@ -160,9 +159,7 @@ type setFocusMsg struct {
 }
 
 func setFocusCmd(f field) tea.Cmd {
-	slog.Debug("queueing setFocus", "field", f)
 	return func() tea.Msg {
-		slog.Debug("message setFocus", "field", f)
 		return setFocusMsg{field: f}
 	}
 }
@@ -183,7 +180,6 @@ func (form mainForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		form = form.resize(msgT.Width, msgT.Height)
 		handled = true
 	case setFocusMsg:
-		slog.Debug("actual setFocus", "field", msgT.field)
 		form, cmd = form.setFocus(msgT.field)
 		cmds = append(cmds, cmd)
 		handled = true
@@ -191,7 +187,6 @@ func (form mainForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msgT.Key == typeList {
 			listMsg, ok := msgT.Msg.(listSelectionChangedMsg)
 			if ok {
-				slog.Debug("saw listSelectionChangedMsg")
 				t2 := form.children.MustGet(typeField).(textModel).SetValue(listMsg.selectedItem).MoveToEnd()
 				form.children = form.children.Set(typeField, t2)
 				handled = true
