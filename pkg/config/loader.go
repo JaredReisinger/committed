@@ -109,19 +109,22 @@ func parseConfigFile(path string) (*Config, error) {
 func (cfg *Config) applyCommitlint(rules commitlint.Rules) {
 	slog.Debug("applying commitlint rules")
 
-	if rules.TypeEnum.Set {
-		cfg.Types = rules.TypeEnum.Value
-	}
+	// if rules.TypeEnum.Set {
+	// 	cfg.Types = rules.TypeEnum.Value
+	// }
 
-	if rules.SubjectMaxLength.Set {
-		cfg.SubjectMaxLength = rules.SubjectMaxLength.Value
-	}
+	// if rules.SubjectMaxLength.Set {
+	// 	cfg.SubjectMaxLength = rules.SubjectMaxLength.Value
+	// }
 
-	if rules.BodyMaxLineLength.Set {
-		cfg.BodyMaxLineLength = rules.BodyMaxLineLength.Value
-	}
+	// if rules.BodyMaxLineLength.Set {
+	// 	cfg.BodyMaxLineLength = rules.BodyMaxLineLength.Value
+	// }
 
-	if rules.HeaderMaxLength.Set {
-		cfg.HeaderMaxLength = rules.HeaderMaxLength.Value
-	}
+	// if rules.HeaderMaxLength.Set {
+	// 	cfg.HeaderMaxLength = rules.HeaderMaxLength.Value
+	// }
+
+	// override, or merge?  We need to support "extends"
+	cfg.Rules.Merge(&rules)
 }

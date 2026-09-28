@@ -36,7 +36,7 @@ func TestWrap(t *testing.T) {
 	} {
 		t.Run(fmt.Sprintf("case %d", i+1), func(t *testing.T) {
 			t.Parallel()
-			actual := wrap(tt.input, tt.limit)
+			actual := Wrap(tt.input, tt.limit)
 			assert.EqualT(t, tt.expected, actual)
 		})
 	}

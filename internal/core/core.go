@@ -72,7 +72,7 @@ func Run(args []string, dryRun bool, logFile string) error {
 			return errors.WithMessage(err, "error writing commit message")
 		}
 	} else {
-		fmt.Printf("DRY-RUN: committed would have written:\n---\n%s---\n", formattedMessage)
+		fmt.Printf("\nDRY-RUN: committed would have written:\n---\n%s---\n", formattedMessage)
 	}
 
 	return nil

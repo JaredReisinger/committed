@@ -27,8 +27,8 @@ func TestParseConfig_Simple(t *testing.T) {
 			cfg, err := parseConfigFile(path)
 			assert.NoError(t, err)
 
-			assert.Equal(t, []string{"feat", "fix"}, cfg.Types)
-			assert.Equal(t, 50, cfg.SubjectMaxLength)
+			assert.Equal(t, []string{"feat", "fix"}, cfg.Rules.TypeEnum.Value)
+			assert.Equal(t, 50, cfg.Rules.SubjectMaxLength.Value)
 		})
 	}
 }
@@ -37,6 +37,7 @@ func TestLoadConfig_Default(t *testing.T) {
 	cfg, err := LoadConfig(t.TempDir())
 	assert.NoError(t, err)
 
-	assert.NotNil(t, cfg.Types)
-	assert.NotEqual(t, []string{}, cfg.Types)
+	types := cfg.Rules.TypeEnum.Value
+	assert.NotNil(t, types)
+	assert.NotEqual(t, []string{}, types)
 }

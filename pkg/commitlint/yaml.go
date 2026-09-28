@@ -2,7 +2,9 @@ package commitlint
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
+	"reflect"
 	"strconv"
 
 	"gopkg.in/yaml.v3"
@@ -26,12 +28,18 @@ func (v *RuleValue[valType]) UnmarshalYAML(node *yaml.Node) error {
 	// wish I could include the parent name!
 	slog.Debug("parsing rule values", "type", "YAML")
 
+	noValue := reflect.TypeOf(v.Value) == reflect.TypeOf(NoValue{})
+	expectedLen := 3
+	if noValue {
+		expectedLen--
+	}
+
 	if node.Kind != yaml.SequenceNode {
 		return errors.New("expected !!seq")
 	}
 
-	if len(node.Content) != 3 {
-		return errors.New("expected three values in rule")
+	if len(node.Content) != expectedLen {
+		return fmt.Errorf("expected %d values in rule", expectedLen)
 	}
 
 	if node.Content[0].Tag != intTag {
@@ -55,9 +63,11 @@ func (v *RuleValue[valType]) UnmarshalYAML(node *yaml.Node) error {
 	}
 
 	// TODO: 3rd value could be anything...
-	err = node.Content[2].Decode(&v.Value)
-	if err != nil {
-		return err
+	if !noValue {
+		err = node.Content[2].Decode(&v.Value)
+		if err != nil {
+			return err
+		}
 	}
 
 	v.Set = true

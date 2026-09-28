@@ -3,13 +3,20 @@ package commitlint
 import (
 	"encoding/json/jsontext"
 	"encoding/json/v2"
-	"errors"
+	"fmt"
 	"log/slog"
+	"reflect"
 )
 
 func (v *RuleValue[valType]) UnmarshalJSON(data []byte) error {
 	// var tmp []any
 	slog.Debug("parsing rule values", "type", "JSON", "data", string(data))
+
+	noValue := reflect.TypeOf(v.Value) == reflect.TypeOf(NoValue{})
+	expectedLen := 3
+	if noValue {
+		expectedLen--
+	}
 
 	// incoming is an array...
 	var tmp []jsontext.Value
@@ -19,8 +26,8 @@ func (v *RuleValue[valType]) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	if len(tmp) != 3 {
-		return errors.New("expected three values in rule")
+	if len(tmp) != expectedLen {
+		return fmt.Errorf("expected %d values in rule", expectedLen)
 	}
 
 	err = json.Unmarshal(tmp[0], &v.Level)
@@ -33,9 +40,11 @@ func (v *RuleValue[valType]) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	err = json.Unmarshal(tmp[2], &v.Value)
-	if err != nil {
-		return err
+	if !noValue {
+		err = json.Unmarshal(tmp[2], &v.Value)
+		if err != nil {
+			return err
+		}
 	}
 
 	v.Set = true

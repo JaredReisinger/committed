@@ -1,7 +1,8 @@
-rules:
-  type-enum: [ 2, always, [feat, fix, docs, style, refactor, perf, test, chore, revert, build, ci] ]
-  type-case: [ 2, always, lower-case ]
-  type-empty: [ 2, always, false ]
-  scope-case: [ 2, always, lower-case ]
-  subject-max-length: [ 2, always, 50 ]
-  body-max-line-length: [ 2, always, 70 ]
+# extends: '@commitlint/config-conventional'
+# rules:
+#   type-enum: [ 2, always, [feat, fix, docs, style, refactor, perf, test, chore, revert, build, ci] ]
+#   type-case: [ 2, always, lower-case ]
+#   type-empty: [ 2, never ]
+#   scope-case: [ 2, always, lower-case ]
+#   subject-max-length: [ 2, always, 50 ]
+#   body-max-line-length: [ 2, always, 70 ]

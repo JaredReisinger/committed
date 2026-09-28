@@ -81,7 +81,7 @@ func (l listModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (l listModel) View() tea.View {
-	// slog.Debug("viewing list", "items", l.items)
+	slog.Debug("viewing list", "items", l.items)
 
 	lines := make([]string, 0, len(l.items))
 	for i, item := range l.items {

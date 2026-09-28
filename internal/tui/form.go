@@ -1,7 +1,8 @@
 package tui
 
 import (
-	"fmt"
+	"log/slog"
+	"math"
 	"strings"
 
 	"charm.land/bubbles/v2/help"
@@ -36,16 +37,16 @@ const (
 // absolute mess, with no sense of immutability at all.  The addition of
 // [teautil.Router] is helping a ton, however.
 type mainForm struct {
-	config       *config.Config
-	existingMsg  *commit.Message // just for init, don't persist
-	focusedField field
-	children     teautil.Router[field, tea.Model]
-	// textinputs    teautil.Router[field, textinputModel]
-	// textareas     teautil.Router[field, textareaModel]
+	config        *config.Config
+	existingMsg   *commit.Message // just for init, don't persist
+	focusedField  field
+	children      teautil.Router[field, tea.Model] // *focusable* children
+	fieldErrs     map[field]error                  // field validation errors
+	winWidth      int
+	winHeight     int
 	bodyMaxHeight int
 	help          help.Model
-	err           error
-	log           string
+	err           error // should this be validation error(s) as well?
 }
 
 // newModel creates a new TUI model with the given configuration and optional
@@ -69,7 +70,7 @@ func newModel(cfg *config.Config, existingMsg *commit.Message) mainForm {
 
 	help := help.New()
 	help.ShowAll = true
-	help.SetWidth(80)
+	help.SetWidth(80) // ??
 
 	form := mainForm{
 		config:       cfg,
@@ -78,73 +79,47 @@ func newModel(cfg *config.Config, existingMsg *commit.Message) mainForm {
 
 		children: teautil.NewRouter(map[field]tea.Model{
 			typeField:        newTextModel(false, "type", initialType),
-			typeList:         newListModel(cfg.Types),
+			typeList:         newListModel(cfg.Rules.TypeEnum.Value),
 			scopeField:       newTextModel(false, "scope", initialScope),
 			descriptionField: newTextModel(false, "description", initialDesc),
-			bodyField:        newTextModel(true, "message body", initialBody),
+			bodyField:        newTextModel(true, "message body", initialBody).SetMinHeight(6).SetDynamicHeight(true).SetMaxContentHeight(1000),
 			footerField:      newTextModel(true, "footer", initialFooter).SetMinHeight(2).SetDynamicHeight(true),
 		}),
+
+		fieldErrs: make(map[field]error, maxField),
 
 		help: help,
 	}
 
-	// // TODO: this should happen in Init!
-	// //
-	// // Pre-populate fields if we have an existing message
-	// if existingMsg != nil {
-	// 	m = m.populateFromExisting()
-	// }
+	// perform initial validation?
+	for f, child := range form.children.All() {
+		t, ok := child.(textModel)
+		if ok {
+			form = form.validate(f, t.Value())
+		}
+	}
 
 	return form
 }
 
 func maxTypeLength(cfg *config.Config) int {
-	maxTyp := 0
-	for _, t := range cfg.Types {
-		w := len(t)
-		if w > maxTyp {
-			maxTyp = w
-		}
+	if cfg.Rules.TypeMaxLength.Active() {
+		return cfg.Rules.TypeMaxLength.Value
 	}
-	return maxTyp
+
+	if cfg.Rules.TypeEnum.Set {
+		maxTyp := 0
+		for _, t := range cfg.Rules.TypeEnum.Value {
+			w := len(t)
+			if w > maxTyp {
+				maxTyp = w
+			}
+		}
+		return maxTyp
+	}
+
+	return 10 // ?
 }
-
-// // populateFromExisting fills the form fields from an existing commit message.
-// func (m form) populateFromExisting() form {
-// 	if m.existingMsg == nil {
-// 		return m
-// 	}
-
-// 	// // Set type
-// 	// if m.existingMsg.Type != "" {
-// 	// 	// Find the type in our config enum
-// 	// 	for i, t := range m.config.Types {
-// 	// 		if t == m.existingMsg.Type {
-// 	// 			typ := m.textareas.MustGet(typeField)
-// 	// 			typ.SetValue(t)
-// 	// 			typ.MoveToBegin()
-// 	// 			m.textareas = m.textareas.Set(typeField, typ)
-// 	// 			break
-// 	// 		}
-// 	// 	}
-// 	// }
-
-// 	// if m.existingMsg.Description != "" {
-// 	// 	desc := m.textareas.MustGet(descriptionField)
-// 	// 	desc.SetValue(m.existingMsg.Description)
-// 	// 	desc.MoveToBegin()
-// 	// 	m.textareas = m.textareas.Set(descriptionField, desc)
-// 	// }
-
-// 	// if m.existingMsg.Body != "" {
-// 	// 	body := m.textareas.MustGet(bodyField)
-// 	// 	body.SetValue(m.existingMsg.Body)
-// 	// 	body.MoveToBegin()
-// 	// 	m.textareas = m.textareas.Set(bodyField, body)
-// 	// }
-
-// 	return m
-// }
 
 // Init initializes the bubbletea program.
 func (form mainForm) Init() tea.Cmd {
@@ -179,19 +154,30 @@ func (form mainForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		form = form.resize(msgT.Width, msgT.Height)
 		handled = true
+
 	case setFocusMsg:
 		form, cmd = form.setFocus(msgT.field)
 		cmds = append(cmds, cmd)
 		handled = true
+
 	case teautil.WrappedMsg[field]:
-		if msgT.Key == typeList {
-			listMsg, ok := msgT.Msg.(listSelectionChangedMsg)
-			if ok {
-				t2 := form.children.MustGet(typeField).(textModel).SetValue(listMsg.selectedItem).MoveToEnd()
+		switch innerMsg := msgT.Msg.(type) {
+		case listSelectionChangedMsg:
+			if msgT.Key == typeList {
+				t2 := form.children.MustGet(typeField).(textModel).SetValue(innerMsg.selectedItem).MoveToEnd()
 				form.children = form.children.Set(typeField, t2)
 				handled = true
+
+				// We also need to fake a "field changed" message!
+				cmds = append(cmds, teautil.Wrap(SendTextModelValueChanged(t2.Value()), typeField))
 			}
+
+		case textModelValueChanged:
+			slog.Debug("text model value changed", "field", msgT.Key, "value", innerMsg.Value)
+			form = form.validate(msgT.Key, innerMsg.Value)
+			handled = true // we don't let this percolate back down, do we?
 		}
+
 	case tea.KeyPressMsg:
 		// REVIEW.... should we check the focus field for handling first?  I
 		// have to think really hard about the order key messages should happen
@@ -218,30 +204,6 @@ func (form mainForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		default:
 			handled = false
 		}
-
-		// case key.Matches(msg, defaultKeyMap.Enter):
-		// 	// enter handling depends on focus...
-		// 	if m.focusedField == bodyField {
-		// 		// // TODO: change to validate as user types?
-		// 		// // Submit the form
-		// 		// if err := m.validateSummary(); err != nil {
-		// 		// 	m.err = err
-		// 		// } else {
-		// 		// 	m.err = nil // clear any error?
-		// 		// 	cmds = append(cmds, tea.Quit)
-		// 		// }
-
-		// 		// delegate enter to details!
-		// 		handled = false
-		// 	} else {
-		// 		m.nextField()
-		// 	}
-
-		// case teautil.WrappedMsg[int]:
-		// 	// forward the message to the appropriate model...
-		// 	targetModel = field(msgT.Key)
-		// 	msg = msgT.Msg
-		// 	// *don't* set handled!
 	}
 
 	// delegate other messages to the field/model with focus...
@@ -265,10 +227,18 @@ func (form mainForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			body := form.children.MustGet(bodyField).(textModel)
 			if body.DynamicHeight() && body.Height() >= form.bodyMaxHeight {
 				body = body.SetDynamicHeight(false)
-				body = body.SetMaxHeight(0)
+				// body = body.SetMaxHeight(0)
 				body = body.SetHeight(form.bodyMaxHeight)
-				form.children = form.children.Set(bodyField, body)
+			} else if body.Height() > form.bodyMaxHeight {
+				body = body.SetHeight(form.bodyMaxHeight)
+			} else {
+				// bubbletea text doesn't expose its internal visual height value
+				textHeight := strings.Count(commit.Wrap(body.Value(), body.Width()), "\n")
+				body = body.SetDynamicHeight(textHeight < form.bodyMaxHeight)
+				// body = body.SetHeight(max(6, textHeight))
+				body = body.SetMaxHeight(form.bodyMaxHeight)
 			}
+			form.children = form.children.Set(bodyField, body)
 		}
 	}
 
@@ -281,7 +251,9 @@ func (form mainForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (form mainForm) resize(winWidth int, winHeight int) mainForm {
-	form.log = fmt.Sprintf("%dx%d", winWidth, winHeight)
+	slog.Debug("window resize", "width", winWidth, "height", winHeight)
+	form.winWidth = winWidth
+	form.winHeight = winHeight
 
 	// We're going to manage the field borders separate from the text controls
 	// because textarea has some rendering challenges with doubling borders with
@@ -289,6 +261,8 @@ func (form mainForm) resize(winWidth int, winHeight int) mainForm {
 
 	// bw := 2 // border width?
 	bh := 2 // border height?
+
+	form.help.SetWidth(winWidth)
 
 	typ := form.children.MustGet(typeField).(textModel)
 	// TODO: size typeList field here as well!
@@ -299,35 +273,53 @@ func (form mainForm) resize(winWidth int, winHeight int) mainForm {
 
 	cfg := form.config
 
-	maxTyp := maxTypeLength(cfg)
+	maxTyp := maxTypeLength(cfg) // do we calculate this every time?
 	typ = typ.SetCharLimit(maxTyp)
 	typ = typ.SetWidth(maxTyp + 1) // +1 for cursor
 
-	scope = scope.SetWidth(10)
+	if cfg.ScopeMaxLength.Active() {
+		scope = scope.SetWidth(10)                                               // soft limit for rendering? or let it grow?
+		scope = scope.SetCharLimit(min(cfg.ScopeMaxLength.Value+1, math.MaxInt)) // +1 for cursor
+	} else {
+		scope = scope.SetWidth(10) // soft limit for rendering? or let it grow?
+	}
 
-	descLimit := min(cfg.SubjectMaxLength, cfg.HeaderMaxLength-maxTyp)
-	desc = desc.SetCharLimit(descLimit)
-	desc = desc.SetWidth(min(descLimit+1, winWidth-typ.Width())) // +1 for cursor
+	// header is entire first line... we don't set sizes based on that...
+	if cfg.Rules.SubjectMaxLength.Active() {
+		descLimit := cfg.Rules.SubjectMaxLength.Value
+		slog.Debug("setting description limit", "subjMax", descLimit, "typeMax", maxTyp)
 
-	body = body.SetWidth(min(cfg.BodyMaxLineLength, winWidth))
+		desc = desc.SetCharLimit(descLimit)
+		desc = desc.SetWidth(min(descLimit+1, winWidth-typ.Width())) // +1 for cursor
+	}
+	// do we have an "else"?
+
+	if cfg.Rules.BodyMaxLineLength.Active() {
+		body = body.SetWidth(min(cfg.Rules.BodyMaxLineLength.Value, winWidth))
+	}
 	helpHeight := 8
-	logHeight := 1
-	form.bodyMaxHeight = winHeight - typ.Height() - bh - bh - helpHeight - logHeight - 1
+	form.bodyMaxHeight = winHeight - typ.Height() - bh - bh - helpHeight - 1 - 2 // -2 for fudging
 	body = body.SetMaxHeight(form.bodyMaxHeight)
 
 	if body.DynamicHeight() && body.Height() >= form.bodyMaxHeight {
 		body = body.SetDynamicHeight(false)
-		body = body.SetMaxHeight(0)
+		// body = body.SetMaxHeight(0)
 		body = body.SetHeight(form.bodyMaxHeight)
+	} else if body.Height() > form.bodyMaxHeight {
+		body = body.SetHeight(form.bodyMaxHeight)
+	} else {
+		// bubbletea text doesn't expose its internal visual height value
+		textHeight := strings.Count(commit.Wrap(body.Value(), body.Width()), "\n")
+		body = body.SetDynamicHeight(textHeight < form.bodyMaxHeight)
+		// body = body.SetHeight(max(6, textHeight))
+		body = body.SetMaxHeight(form.bodyMaxHeight)
 	}
 
-	// it would be nice to switch back to dynamic if the content shrinks, but
-	// there's no easy way to get "how many visual lines are needed?"
-	//
-	// TODO: maybe get the text, run it through our wrapping helper, and then
-	// use that for the height?
-
-	footer = footer.SetWidth(min(cfg.BodyMaxLineLength, winWidth))
+	footWidth := body.Width()
+	if cfg.Rules.FooterMaxLineLength.Active() {
+		footWidth = cfg.Rules.FooterMaxLineLength.Value
+	}
+	footer = footer.SetWidth(min(footWidth, winWidth))
 
 	form.help.SetWidth(winWidth)
 
@@ -338,6 +330,84 @@ func (form mainForm) resize(winWidth int, winHeight int) mainForm {
 		bodyField:        body,
 		footerField:      footer,
 	})
+
+	return form
+}
+
+// Validates *at least* the field/value. May validate other fields or
+// combinations in some cases.
+func (form mainForm) validate(f field, value string) mainForm {
+	// I don't love that this is a ginormous function that validates individual
+	// checks, but 🤷🏼‍♂️.  I still need to think about how to normalize the
+	// commitlint rules into the validation config for the UI.
+	//
+	// Would it be helpful to take the union of all field-level settings and
+	// have a validator that takes that union and the string value? That would
+	// at least deduplicate things some.
+	var err error
+	switch f {
+	case typeField:
+		err = validate(value, &fieldRules{
+			caseRule:           &form.config.TypeCase,
+			multiCaseRule:      nil,
+			delimiterStyleRule: nil,
+			emptyRule:          &form.config.TypeEmpty,
+			enumRule:           &form.config.TypeEnum,
+			fullStopRule:       nil,
+			maxLengthRule:      &form.config.TypeMaxLength,
+			minLengthRule:      &form.config.TypeMinLength,
+		})
+
+	case scopeField:
+		err = validate(value, &fieldRules{
+			caseRule:           &form.config.ScopeCase,
+			multiCaseRule:      nil,
+			delimiterStyleRule: nil, // &form.config.ScopeDelimeterStyle, // []string instead of string!
+			emptyRule:          &form.config.ScopeEmpty,
+			enumRule:           &form.config.ScopeEnum,
+			fullStopRule:       nil,
+			maxLengthRule:      &form.config.ScopeMaxLength,
+			minLengthRule:      &form.config.ScopeMinLength,
+		})
+
+	case descriptionField:
+		err = validate(value, &fieldRules{
+			caseRule:           nil,
+			multiCaseRule:      &form.config.SubjectCase,
+			delimiterStyleRule: nil,
+			emptyRule:          &form.config.SubjectEmpty,
+			enumRule:           nil,
+			fullStopRule:       &form.config.SubjectFullStop,
+			maxLengthRule:      &form.config.SubjectMaxLength,
+			minLengthRule:      &form.config.SubjectMinLength,
+		})
+
+	case bodyField:
+		err = validate(value, &fieldRules{
+			caseRule:           &form.config.BodyCase,
+			multiCaseRule:      nil,
+			delimiterStyleRule: nil,
+			emptyRule:          &form.config.BodyEmpty,
+			enumRule:           nil,
+			fullStopRule:       &form.config.BodyFullStop,
+			maxLengthRule:      &form.config.BodyMaxLength,
+			minLengthRule:      &form.config.BodyMinLength,
+		})
+
+	case footerField:
+		err = validate(value, &fieldRules{
+			caseRule:           nil,
+			multiCaseRule:      nil,
+			delimiterStyleRule: nil,
+			emptyRule:          &form.config.FooterEmpty,
+			enumRule:           nil,
+			fullStopRule:       nil,
+			maxLengthRule:      &form.config.FooterMaxLength,
+			minLengthRule:      &form.config.FooterMinLength,
+		})
+	}
+
+	form.fieldErrs[f] = err
 
 	return form
 }
@@ -404,17 +474,17 @@ func (form mainForm) prevField() tea.Cmd {
 	return setFocusCmd((form.focusedField + maxField - 1) % maxField)
 }
 
-// validateDescription checks if the description field meets requirements.
-func (form mainForm) validateDescription() error {
-	// description := strings.TrimSpace(desc.Value())
-	// if description == "" {
-	// 	return fmt.Errorf("description is required")
-	// }
-	// if len(description) > m.config.SubjectMaxLength {
-	// 	return fmt.Errorf("description must be ≤ %d characters (currently %d)", m.config.SubjectMaxLength, len(description))
-	// }
-	return nil
-}
+// // validateDescription checks if the description field meets requirements.
+// func (form mainForm) validateDescription() error {
+// 	// description := strings.TrimSpace(desc.Value())
+// 	// if description == "" {
+// 	// 	return fmt.Errorf("description is required")
+// 	// }
+// 	// if len(description) > m.config.SubjectMaxLength {
+// 	// 	return fmt.Errorf("description must be ≤ %d characters (currently %d)", m.config.SubjectMaxLength, len(description))
+// 	// }
+// 	return nil
+// }
 
 type KeyBinder interface {
 	GetKeyBindings() []key.Binding
@@ -422,26 +492,45 @@ type KeyBinder interface {
 
 // View renders the TUI.
 func (form mainForm) View() tea.View {
-	// the view content might be the value, it might be a placeholder, and it
-	// includes padding
-	views := make(map[field]string, form.children.Len())
-
-	for f, child := range form.children.All() {
-		views[f] = child.View().Content
+	// TODO: would it be better to define a type for the value/valid/decoration
+	// info? I suspect that would be better than the parallel maps.
+	type info struct {
+		view    string
+		valid   bool
+		message string
+		render  string
 	}
 
-	// the renders are the decorated versions of the fields
-	renders := make(map[field]string, form.children.Len())
+	infos := make(map[field]info, form.children.Len())
 
-	// I would *love* to combine borders in some cases... it would make the
-	// while-being-edited form look much more like the final output.
 	for f, child := range form.children.All() {
+		var info info
+
+		// t, ok := child.(textModel)
+		// if ok {
+		// 	slog.Warn("getting child view content", "child", f, "width", t.Width())
+		// }
+		info.view = child.View().Content
+
+		info.valid = form.fieldErrs[f] == nil
+
+		// Figure out the decorator; depends on whether the field is valid, etc.
+		// This also depends on where the focus is, as we play some interesting
+		// games with borders to keep the rendering concise.
 		var childState state = blurred
 		var childStatus status = defaultStatus
 		var childKind fieldKind = single
 		if f == form.focusedField {
 			childState = focused
 		}
+		// we *used* to have a "is the field even validate-able?" value, but
+		// there's really not a ton of reason to support that
+		if info.valid {
+			childStatus = valid
+		} else {
+			childStatus = invalid
+		}
+
 		// TODO: make an interface for styling single/multi...
 		if f == typeList || child.(textModel).isArea {
 			childKind = multi
@@ -467,7 +556,23 @@ func (form mainForm) View() tea.View {
 			}
 		}
 
-		renders[f] = border.Render(views[f])
+		info.render = border.Render(info.view)
+
+		infos[f] = info
+	}
+
+	// If there's an error (validation!), make sure to show it. Do we do both
+	// field and global validation?
+	var errMsg string
+	if form.fieldErrs[form.focusedField] != nil {
+		errMsg = form.fieldErrs[form.focusedField].Error()
+	} else if form.err != nil {
+		errMsg = form.err.Error()
+	}
+
+	if errMsg != "" {
+		slog.Debug("showing error", "err", errMsg)
+		errMsg = lipgloss.NewStyle().Width(form.winWidth).Foreground(defaultColors[invalid][focused][decoration]).Render(errMsg)
 	}
 
 	// get the focused field key bindings...
@@ -488,14 +593,14 @@ func (form mainForm) View() tea.View {
 	header := lipgloss.JoinHorizontal(
 		lipgloss.Top,
 		" ", // one space to align body left border
-		renders[typeField],
+		infos[typeField].render,
 	)
 	if showScope {
 		header = lipgloss.JoinHorizontal(
 			lipgloss.Top,
 			header,
 			"(",
-			renders[scopeField],
+			infos[scopeField].render,
 			")",
 		)
 	}
@@ -503,15 +608,28 @@ func (form mainForm) View() tea.View {
 		lipgloss.Top,
 		header,
 		": ",
-		renders[descriptionField],
+		infos[descriptionField].render,
 	)
 
 	mainView := lipgloss.JoinVertical(
 		lipgloss.Left,
 		"\n",
 		header,
-		renders[bodyField],
-		renders[footerField],
+		infos[bodyField].render,
+		infos[footerField].render,
+	)
+
+	if errMsg != "" {
+		mainView = lipgloss.JoinVertical(
+			lipgloss.Left,
+			mainView,
+			errMsg,
+		)
+	}
+
+	mainView = lipgloss.JoinVertical(
+		lipgloss.Left,
+		mainView,
 		form.help.View(helpKeys), // &defaultKeyMap),
 	)
 
@@ -520,13 +638,12 @@ func (form mainForm) View() tea.View {
 	}
 
 	if form.focusedField == typeField || form.focusedField == typeList {
-		layers = append(layers, lipgloss.NewLayer(renders[typeList]).X(10).Y(1))
+		layers = append(layers, lipgloss.NewLayer(infos[typeList].render).X(10).Y(1))
 	}
 
 	comp := lipgloss.NewCompositor(layers...)
 
 	return tea.NewView(comp.Render())
-
 }
 
 // Result returns the composed commit message and any error.

@@ -2,6 +2,7 @@ package tui
 
 import (
 	"image/color"
+	"log/slog"
 
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/textarea"
@@ -143,6 +144,17 @@ func newTextModel(isArea bool, placeholder string, initial string) textModel {
 // static compile-time check that the shim meets the interface
 var _ tea.Model = textModel{}
 
+// "public" messages
+type textModelValueChanged struct {
+	Value string
+}
+
+func SendTextModelValueChanged(value string) tea.Cmd {
+	return func() tea.Msg {
+		return textModelValueChanged{value}
+	}
+}
+
 func (t textModel) Init() tea.Cmd { return nil }
 
 func (t textModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -152,6 +164,8 @@ func (t textModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var m tea.Model
 	var cmd tea.Cmd
 
+	before := t.Value()
+
 	if !t.isArea {
 		m, cmd = t.input.Update(msg)
 		input = m.(textinputModel)
@@ -160,7 +174,15 @@ func (t textModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		area = m.(textareaModel)
 	}
 
-	return textModel{t.isArea, input, area}, cmd
+	t2 := textModel{t.isArea, input, area}
+
+	after := t2.Value()
+
+	if after != before {
+		cmd = tea.Batch(cmd, SendTextModelValueChanged(after))
+	}
+
+	return t2, cmd
 }
 
 func (t textModel) View() tea.View {
@@ -172,11 +194,9 @@ func (t textModel) View() tea.View {
 }
 
 func (t textModel) clone() textModel {
-	return textModel{
-		isArea: t.isArea,
-		input:  t.input,
-		area:   t.area,
-	}
+	slog.Debug("cloning textModel", "isArea", t.isArea)
+	// can we just return t by value?
+	return textModel{t.isArea, t.input, t.area}
 }
 
 // Other textinput/textarea APIs we need to shim...in the underlying models,
@@ -194,11 +214,22 @@ func (t textModel) Value() string {
 func (t textModel) SetValue(value string) textModel {
 	t2 := t.clone()
 
+	// before := t2.Value()
+
 	if !t.isArea {
 		t2.input.SetValue(value)
 	} else {
 		t2.area.SetValue(value)
 	}
+
+	// after := t2.Value()
+
+	// if after != before {
+	// 	// Sadly, this is *outside* the Update() loop, which means we can't
+	// 	// trigger a change event.  The caller will have to manage it.
+
+	// 	// slog.Debug("content changed", "before", before, "after", after, "validation", t2.validationMessage)
+	// }
 
 	return t2
 }

@@ -35,9 +35,9 @@ func (m *Message) Format(cfg *config.Config) string {
 	var footer strings.Builder
 
 	// Header: type(scope)[!]: description
-	if !slices.Contains(cfg.Types, m.Type) {
+	if cfg.Rules.TypeEnum.Set && !slices.Contains(cfg.Rules.TypeEnum.Value, m.Type) {
 		// Should we prevent exiting the editor in this case?
-		slog.Warn("type is not permitted", "type", m.Type, "permitted", cfg.Types)
+		slog.Warn("type is not permitted", "type", m.Type, "permitted", cfg.Rules.TypeEnum.Value)
 	}
 	header.WriteString(m.Type)
 
@@ -56,16 +56,15 @@ func (m *Message) Format(cfg *config.Config) string {
 	}
 	header.WriteString(m.Description)
 
-	if header.Len() > cfg.HeaderMaxLength {
-		slog.Warn("header line exceeds max length", "max", cfg.HeaderMaxLength, "actual", header.Len(), "text", header.String())
+	if cfg.Rules.HeaderMaxLength.Set && header.Len() > cfg.Rules.HeaderMaxLength.Value {
+		slog.Warn("header line exceeds max length", "max", cfg.Rules.HeaderMaxLength.Value, "actual", header.Len(), "text", header.String())
 	}
 
 	// Body -- the content coming out of the TUI is *not* wrapped; we need to do
 	// so at the configured line-length
-	if m.Body != "" {
-		if cfg.BodyMaxLineLength > 0 {
-			body.WriteString(wrap(m.Body, cfg.BodyMaxLineLength))
-		}
+	if m.Body != "" && cfg.Rules.BodyMaxLineLength.Set {
+		body.WriteString(Wrap(m.Body, cfg.Rules.BodyMaxLineLength.Value))
+		// do we need to check total length?
 	}
 
 	// Footers
@@ -113,10 +112,10 @@ func (m *Message) IsBreaking() bool {
 	return false
 }
 
-// wrap performs word-wrapping. It's naive for now, but might add "nice"
+// Wrap performs word-wrapping. It's naive for now, but might add "nice"
 // behavior like indenting list items (a la markdown) or hyphenation in the
 // future.
-func wrap(s string, limit int) string {
+func Wrap(s string, limit int) string {
 	// We run through the list, keeping track of the last whitespace we saw. We
 	// do *not* compress consecutive whitespace into a single space, there are
 	// legitimate cases where the author has either leading whitespace or is
