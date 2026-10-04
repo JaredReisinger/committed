@@ -2,7 +2,6 @@ package tui
 
 import (
 	"log/slog"
-	"math"
 	"strings"
 
 	"charm.land/bubbles/v2/help"
@@ -76,6 +75,14 @@ func newModel(cfg *config.Config, existingMsg *commit.Message) mainForm {
 		config:       cfg,
 		existingMsg:  existingMsg,
 		focusedField: typeList,
+
+		// There's an interesting question about whether the form's fields
+		// should be *all* models or just focusable ones.  Perhaps `children`
+		// should be *all* models (including help), and "focusableFields" should
+		// be a separate list that we use to manage focus.  That would make
+		// message passing more consistent and extensible.  (Just imagine if the
+		// "help" started using/needing messages as opposed to being a
+		// pure-display component.)
 
 		children: teautil.NewRouter(map[field]tea.Model{
 			typeField:        newTextModel(false, "type", initialType),
@@ -156,15 +163,32 @@ func (form mainForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		handled = true
 
 	case setFocusMsg:
+		// If the focus *was* type or scope, we need to play some positioning
+		// tricks to ensure the field isn't scrolled weirdly.
+
+		// switch form.focusedField {
+		// case typeField, scopeField:
+		// 	t2 := form.children.MustGet(form.focusedField).(textModel).MoveToBegin().MoveToEnd()
+		// 	form.children = form.children.Set(form.focusedField, t2)
+		// }
+
 		form, cmd = form.setFocus(msgT.field)
 		cmds = append(cmds, cmd)
+		// we also need to resize fields as focus changes...
+		form = form.resize(form.winWidth, form.winHeight)
 		handled = true
 
 	case teautil.WrappedMsg[field]:
 		switch innerMsg := msgT.Msg.(type) {
 		case listSelectionChangedMsg:
 			if msgT.Key == typeList {
-				t2 := form.children.MustGet(typeField).(textModel).SetValue(innerMsg.selectedItem).MoveToEnd()
+				// The MoveToBegin/MoveToEnd ensures we don't have a weirdly
+				// scrolled field afterwards
+				t2 := form.children.MustGet(typeField).(textModel).SetValue(innerMsg.selectedItem).MoveToBegin()
+				form.children = form.children.Set(typeField, t2)
+				// changing the type *can* change the layout
+				form = form.resize(form.winWidth, form.winHeight)
+				t2 = form.children.MustGet(typeField).(textModel).MoveToEnd()
 				form.children = form.children.Set(typeField, t2)
 				handled = true
 
@@ -221,6 +245,9 @@ func (form mainForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// m.textareas, cmd = m.textareas.Update(msg, targetModel)
 		cmds = append(cmds, cmd)
 
+		// TODO: the resize logic should be in control of returning the "should
+		// the body be dynamic or not" values.
+		//
 		// If the focused field is the body, check for dynamic->fixed size
 		// changing
 		if form.focusedField == bodyField {
@@ -250,19 +277,15 @@ func (form mainForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return form, tea.Batch(cmds...)
 }
 
+// Field sizes and presentation needs to get calculated *often*, because we want
+// it to be responsive to content and to focus. At the same time, we don't want
+// the sizing logic to be scattered all over the code.
+
 func (form mainForm) resize(winWidth int, winHeight int) mainForm {
 	slog.Debug("window resize", "width", winWidth, "height", winHeight)
+
 	form.winWidth = winWidth
 	form.winHeight = winHeight
-
-	// We're going to manage the field borders separate from the text controls
-	// because textarea has some rendering challenges with doubling borders with
-	// an empty field.  For now, we're calc'ing 2x and 2y for borders...
-
-	// bw := 2 // border width?
-	bh := 2 // border height?
-
-	form.help.SetWidth(winWidth)
 
 	typ := form.children.MustGet(typeField).(textModel)
 	// TODO: size typeList field here as well!
@@ -273,55 +296,104 @@ func (form mainForm) resize(winWidth int, winHeight int) mainForm {
 
 	cfg := form.config
 
-	maxTyp := maxTypeLength(cfg) // do we calculate this every time?
-	typ = typ.SetCharLimit(maxTyp)
-	typ = typ.SetWidth(maxTyp + 1) // +1 for cursor
+	// Set up the calculateSizes structure... could we cache a lot of this?
+	// Might need to alter the constraints to not include current content size.
+	// NOTE... no good way to get count of current body lines...
 
-	if cfg.ScopeMaxLength.Active() {
-		scope = scope.SetWidth(10)                                               // soft limit for rendering? or let it grow?
-		scope = scope.SetCharLimit(min(cfg.ScopeMaxLength.Value+1, math.MaxInt)) // +1 for cursor
-	} else {
-		scope = scope.SetWidth(10) // soft limit for rendering? or let it grow?
+	constraints := layoutConstraints{
+		maxWidth:     winWidth,
+		maxHeight:    winHeight,
+		focus:        form.focusedField,
+		typeWidth:    dimension{nominalLength(typ, true), cfg.TypeMinLength.GetValue(0), cfg.TypeMaxLength.GetValue(-1)},
+		scopeWidth:   dimension{nominalLength(scope, form.focusedField == scopeField), cfg.ScopeMinLength.GetValue(0), cfg.ScopeMaxLength.GetValue(-1)},
+		descWidth:    dimension{nominalLength(desc, true), cfg.SubjectMinLength.GetValue(0), cfg.SubjectMaxLength.GetValue(-1)},
+		bodyWidth:    dimension{nominalLength(body, true), cfg.BodyMinLength.GetValue(0), cfg.BodyMaxLineLength.GetValue(-1)},
+		bodyHeight:   dimension{0, 4, -1},
+		footerWidth:  dimension{nominalLength(footer, true), cfg.FooterMinLength.GetValue(0), cfg.FooterMaxLineLength.GetValue(-1)},
+		footerHeight: dimension{0, 2, -1},
 	}
 
-	// header is entire first line... we don't set sizes based on that...
-	if cfg.Rules.SubjectMaxLength.Active() {
-		descLimit := cfg.Rules.SubjectMaxLength.Value
-		slog.Debug("setting description limit", "subjMax", descLimit, "typeMax", maxTyp)
-
-		desc = desc.SetCharLimit(descLimit)
-		desc = desc.SetWidth(min(descLimit+1, winWidth-typ.Width())) // +1 for cursor
-	}
-	// do we have an "else"?
-
-	if cfg.Rules.BodyMaxLineLength.Active() {
-		body = body.SetWidth(min(cfg.Rules.BodyMaxLineLength.Value, winWidth))
-	}
-	helpHeight := 8
-	form.bodyMaxHeight = winHeight - typ.Height() - bh - bh - helpHeight - 1 - 2 // -2 for fudging
-	body = body.SetMaxHeight(form.bodyMaxHeight)
-
-	if body.DynamicHeight() && body.Height() >= form.bodyMaxHeight {
-		body = body.SetDynamicHeight(false)
-		// body = body.SetMaxHeight(0)
-		body = body.SetHeight(form.bodyMaxHeight)
-	} else if body.Height() > form.bodyMaxHeight {
-		body = body.SetHeight(form.bodyMaxHeight)
-	} else {
-		// bubbletea text doesn't expose its internal visual height value
-		textHeight := strings.Count(commit.Wrap(body.Value(), body.Width()), "\n")
-		body = body.SetDynamicHeight(textHeight < form.bodyMaxHeight)
-		// body = body.SetHeight(max(6, textHeight))
-		body = body.SetMaxHeight(form.bodyMaxHeight)
+	// shoehorn in max type size... this should happen differently...
+	if constraints.typeWidth.max == -1 {
+		constraints.typeWidth.max = maxTypeLength(cfg)
 	}
 
-	footWidth := body.Width()
-	if cfg.Rules.FooterMaxLineLength.Active() {
-		footWidth = cfg.Rules.FooterMaxLineLength.Value
-	}
-	footer = footer.SetWidth(min(footWidth, winWidth))
+	sizes := calculateSizes(constraints)
+	slog.Info("resize",
+		"constraints", constraints.LogValue(),
+		"sizes", sizes.LogValue(),
+	)
 
-	form.help.SetWidth(winWidth)
+	typ = typ.SetMinWidth(10)
+	// typ = typ.SetWidth(sizes.typeWidth)
+	// scope = scope.SetWidth(sizes.scopeWidth) // should we be setting max instead?
+	desc = desc.SetWidth(sizes.descWidth)
+
+	body = body.SetWidth(sizes.bodyWidth)
+	// how do we want to do height?
+	footer = footer.SetWidth(sizes.footerWidth)
+	// how do we want to do height?
+
+	form.help.SetWidth(winWidth) // this *should* return an updated model!
+
+	// // We're going to manage the field borders separate from the text controls
+	// // because textarea has some rendering challenges with doubling borders with
+	// // an empty field.  For now, we're calc'ing 2x and 2y for borders...
+
+	// // bw := 2 // border width?
+	// bh := 2 // border height?
+
+	// form.help.SetWidth(winWidth)
+
+	// maxTyp := maxTypeLength(cfg) // do we calculate this every time?
+	// typ = typ.SetCharLimit(maxTyp)
+	// typ = typ.SetWidth(maxTyp + 1) // +1 for cursor
+
+	// if cfg.ScopeMaxLength.Active() {
+	// 	scope = scope.SetWidth(10)                                               // soft limit for rendering? or let it grow?
+	// 	scope = scope.SetCharLimit(min(cfg.ScopeMaxLength.Value+1, math.MaxInt)) // +1 for cursor
+	// } else {
+	// 	scope = scope.SetWidth(10) // soft limit for rendering? or let it grow?
+	// }
+
+	// // header is entire first line... we don't set sizes based on that...
+	// if cfg.Rules.SubjectMaxLength.Active() {
+	// 	descLimit := cfg.Rules.SubjectMaxLength.Value
+	// 	slog.Debug("setting description limit", "subjMax", descLimit, "typeMax", maxTyp)
+
+	// 	desc = desc.SetCharLimit(descLimit)
+	// 	desc = desc.SetWidth(min(descLimit+1, winWidth-typ.Width())) // +1 for cursor
+	// }
+	// // do we have an "else"?
+
+	// if cfg.Rules.BodyMaxLineLength.Active() {
+	// 	body = body.SetWidth(min(cfg.Rules.BodyMaxLineLength.Value, winWidth))
+	// }
+	// helpHeight := 8
+	// form.bodyMaxHeight = winHeight - typ.Height() - bh - bh - helpHeight - 1 - 2 // -2 for fudging
+	// body = body.SetMaxHeight(form.bodyMaxHeight)
+
+	// if body.DynamicHeight() && body.Height() >= form.bodyMaxHeight {
+	// 	body = body.SetDynamicHeight(false)
+	// 	// body = body.SetMaxHeight(0)
+	// 	body = body.SetHeight(form.bodyMaxHeight)
+	// } else if body.Height() > form.bodyMaxHeight {
+	// 	body = body.SetHeight(form.bodyMaxHeight)
+	// } else {
+	// 	// bubbletea text doesn't expose its internal visual height value
+	// 	textHeight := strings.Count(commit.Wrap(body.Value(), body.Width()), "\n")
+	// 	body = body.SetDynamicHeight(textHeight < form.bodyMaxHeight)
+	// 	// body = body.SetHeight(max(6, textHeight))
+	// 	body = body.SetMaxHeight(form.bodyMaxHeight)
+	// }
+
+	// footWidth := body.Width()
+	// if cfg.Rules.FooterMaxLineLength.Active() {
+	// 	footWidth = cfg.Rules.FooterMaxLineLength.Value
+	// }
+	// footer = footer.SetWidth(min(footWidth, winWidth))
+
+	// form.help.SetWidth(winWidth)
 
 	form.children = form.children.SetMap(map[field]tea.Model{
 		typeField:        typ,
@@ -332,6 +404,17 @@ func (form mainForm) resize(winWidth int, winHeight int) mainForm {
 	})
 
 	return form
+}
+
+// nominalLength handles ensuring there's space for the placeholder when there's
+// no content
+func nominalLength(t textModel, considerPlaceholder bool) int {
+	val := t.Value()
+	if val == "" && considerPlaceholder {
+		val = t.Placeholder()
+	}
+
+	return len(val)
 }
 
 // Validates *at least* the field/value. May validate other fields or
@@ -510,7 +593,16 @@ func (form mainForm) View() tea.View {
 		// if ok {
 		// 	slog.Warn("getting child view content", "child", f, "width", t.Width())
 		// }
+
 		info.view = child.View().Content
+		// if t, ok := child.(textModel); ok && f <= descriptionField {
+		// 	// textinput adds padding sometimes, which can cause it to render
+		// 	// "width+1", and we're really particular about that.  We have to
+		// 	// double-check and trim it if needed.
+		// 	if lipgloss.Width(info.view) > t.Width() {
+		// 		info.view = lipgloss.NewStyle().MaxWidth(t.Width()).Render(info.view)
+		// 	}
+		// }
 
 		info.valid = form.fieldErrs[f] == nil
 

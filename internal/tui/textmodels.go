@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"image/color"
 	"log/slog"
 
@@ -23,9 +24,11 @@ import (
 
 // ===== textinput ============================================================
 
-// textinputModel shims and fixes [textinput.Model] to be a proper [tea.Model]
+// textinputModel shims and fixes [textinput.Model] to be a proper [tea.Model].
+// It also adds a "minimum width" feature which we need.
 type textinputModel struct {
 	textinput.Model
+	minWidth int
 }
 
 func newTextInput(placeholder string) textinputModel {
@@ -47,7 +50,7 @@ func newTextInput(placeholder string) textinputModel {
 		},
 	})
 
-	return textinputModel{m}
+	return textinputModel{m, len(placeholder)}
 }
 
 // static compile-time check that the shim meets the interface
@@ -57,11 +60,61 @@ func (t textinputModel) Init() tea.Cmd { return nil }
 
 func (t textinputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	inner, cmd := t.Model.Update(msg)
-	return textinputModel{inner}, cmd
+	return textinputModel{inner, t.minWidth}, cmd
 }
 
 func (t textinputModel) View() tea.View {
-	return tea.NewView(t.Model.View())
+	origWidth := t.Model.Width()
+	if origWidth < t.minWidth {
+		slog.Debug("textinput temporarily bumping width",
+			"from", origWidth,
+			"to", t.minWidth,
+		)
+		t.Model.SetWidth(t.minWidth)
+	}
+	view := t.Model.View()
+	t.Model.SetWidth(origWidth) // t.Model isn't immutable, sadly
+
+	// t.Model.View() *will* render an extra character for the cursor often, so
+	// we check to see if it has focus or not, and potentially trim it.
+	contentWidth := len(t.Model.Value())
+	expectWidth := max(t.minWidth, contentWidth)
+	if origWidth > 0 {
+		expectWidth = min(expectWidth, origWidth)
+	}
+	viewWidth := lipgloss.Width(view)
+	focused := t.Model.Focused()
+
+	slog.Debug("checking textinput padding",
+		"width", origWidth,
+		"minWidth", t.minWidth,
+		"contentWidth", contentWidth,
+		"expectWidth", expectWidth,
+		"view", fmt.Sprintf("[%s]", view),
+		"viewWidth", viewWidth,
+		"focused", focused,
+	)
+	if viewWidth > expectWidth && !t.Model.Focused() {
+		// dead-reckon that we *always* trim one character...
+		correctWidth := viewWidth - 1
+		if expectWidth > 0 {
+			correctWidth = expectWidth
+		}
+		view = lipgloss.NewStyle().Width(correctWidth).Render(view)
+	} else if viewWidth < t.minWidth {
+		view = lipgloss.NewStyle().PaddingRight(t.minWidth - viewWidth).Render(view)
+	}
+
+	return tea.NewView(view)
+}
+
+func (t textinputModel) MinWidth() int {
+	return t.minWidth
+}
+
+func (t textinputModel) SetMinWidth(w int) textinputModel {
+	// sort of like SetWidth, but does not clamp maximum
+	return textinputModel{t.Model, w}
 }
 
 // ===== textarea =============================================================
@@ -194,7 +247,8 @@ func (t textModel) View() tea.View {
 }
 
 func (t textModel) clone() textModel {
-	slog.Debug("cloning textModel", "isArea", t.isArea)
+	// slog.Debug("cloning textModel", "isArea", t.isArea)
+
 	// can we just return t by value?
 	return textModel{t.isArea, t.input, t.area}
 }
@@ -202,6 +256,14 @@ func (t textModel) clone() textModel {
 // Other textinput/textarea APIs we need to shim...in the underlying models,
 // some of these are just exported properties. In textModel, it *must* be
 // getter/setter methods.
+
+func (t textModel) Placeholder() string {
+	if !t.isArea {
+		return t.input.Placeholder
+	}
+
+	return t.area.Placeholder
+}
 
 func (t textModel) Value() string {
 	if !t.isArea {
@@ -366,6 +428,29 @@ func (t textModel) SetWidth(width int) textModel {
 		t2.input.SetWidth(width)
 	} else {
 		t2.area.SetWidth(width)
+	}
+
+	return t2
+}
+
+func (t textModel) MinWidth() int {
+	if !t.isArea {
+		// for textinput CharLimit === MaxWidth
+		return t.input.MinWidth()
+	}
+
+	return 0 // not needed for areas?
+
+}
+
+func (t textModel) SetMinWidth(width int) textModel {
+	t2 := t.clone()
+
+	if !t.isArea {
+		t2.input.SetMinWidth(width)
+	} else {
+		// nop!
+		slog.Warn("textModel area cannot SetMinWidth")
 	}
 
 	return t2

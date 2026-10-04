@@ -23,6 +23,6 @@ type Config struct {
 func DefaultConfig() *Config {
 	return &Config{
 		// Rules: commitlint.DefaultRules,
-		Rules: commitlint.ConventionalCommitRules,
+		Rules: commitlint.ConventionalConfigRules,
 	}
 }

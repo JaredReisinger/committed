@@ -65,6 +65,13 @@ func (r *RuleValue[T]) Active() bool {
 	return r != nil && r.Set && r.Level != Disabled
 }
 
+func (r *RuleValue[T]) GetValue(defaultValue T) T {
+	if r.Active() {
+		return r.Value
+	}
+	return defaultValue
+}
+
 func (r *RuleValue[T]) Merge(other *RuleValue[T]) {
 	if other != nil && other.Set {
 		*r = *other
@@ -216,10 +223,10 @@ var DefaultRules = Rules{
 	TypeMinLength: RuleValue[int]{Disabled, Always, 0, true},
 }
 
-// These are in the order defined in
-// https://github.com/conventional-changelog/commitlint/blob/master/%40commitlint/config-conventional/src/index.ts
-// to make it easier to compare
-var ConventionalCommitRules = Rules{
+// @commitlint/config-conventional -- as of 2026-09-28 -- in the order defined
+// in https://github.com/conventional-changelog/commitlint/blob/master/...
+// %40commitlint/config-conventional/src/index.ts to make it easier to compare
+var ConventionalConfigRules = Rules{
 	BodyLeadingBlank:    RuleValue[NoValue]{Warning, Always, NoValue{}, true},
 	BodyMaxLineLength:   RuleValue[int]{Error, Always, 100, true},
 	FooterLeadingBlank:  RuleValue[NoValue]{Warning, Always, NoValue{}, true},
@@ -232,4 +239,21 @@ var ConventionalCommitRules = Rules{
 	TypeCase:            RuleValue[string]{Error, Always, "lower-case", true},
 	TypeEmpty:           RuleValue[NoValue]{Error, Never, NoValue{}, true},
 	TypeEnum:            RuleValue[[]string]{Error, Always, []string{"build", "chore", "ci", "docs", "feat", "fix", "perf", "refactor", "revert", "style", "test"}, true},
+}
+
+// @commitlint/config-conventional -- as of 2026-09-28 -- in the order defined
+// in https://github.com/conventional-changelog/commitlint/blob/master/...
+// %40commitlint/config-angular/src/index.ts to make it easier to compare
+var AngularConfigRules = Rules{
+	SubjectExclamationMark: RuleValue[NoValue]{Error, Never, NoValue{}, true},
+	BodyLeadingBlank:       RuleValue[NoValue]{Warning, Always, NoValue{}, true},
+	FooterLeadingBlank:     RuleValue[NoValue]{Warning, Always, NoValue{}, true},
+	HeaderMaxLength:        RuleValue[int]{Error, Always, 72, true},
+	ScopeCase:              RuleValue[string]{Error, Always, "lower-case", true},
+	SubjectCase:            RuleValue[[]string]{Error, Never, []string{"sentence-case", "start-case", "pascal-case", "upper-case"}, true},
+	SubjectEmpty:           RuleValue[NoValue]{Error, Never, NoValue{}, true},
+	SubjectFullStop:        RuleValue[string]{Error, Never, ".", true},
+	TypeCase:               RuleValue[string]{Error, Always, "lower-case", true},
+	TypeEmpty:              RuleValue[NoValue]{Error, Never, NoValue{}, true},
+	TypeEnum:               RuleValue[[]string]{Error, Always, []string{"build", "ci", "docs", "feat", "fix", "perf", "refactor", "revert", "style", "test"}, true},
 }

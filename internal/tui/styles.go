@@ -121,17 +121,6 @@ var (
 			Color: defaultColors[defaultStatus][focused][cursor],
 		},
 	}
-
-	singleDecoration = lipgloss.NewStyle().
-				Border(underBorder, false, false, true, false)
-
-	areaDecoration = lipgloss.NewStyle().
-			Border(lipgloss.NormalBorder(), true, true, true, true)
-
-	focusSingle = singleDecoration.BorderForeground(defaultColors[defaultStatus][focused][decoration])
-	blurSingle  = singleDecoration.BorderForeground(defaultColors[defaultStatus][blurred][decoration])
-	focusArea   = areaDecoration.BorderForeground(defaultColors[defaultStatus][focused][decoration])
-	blurArea    = areaDecoration.BorderForeground(defaultColors[defaultStatus][blurred][decoration])
 )
 
 // For decorations, I really wanted to handle "auto-merging" top/bottom borders,
@@ -149,7 +138,7 @@ const (
 var (
 	kindDecorations = map[fieldKind]lipgloss.Style{
 		single: lipgloss.NewStyle().Border(underBorder, false, false, true, false),
-		multi:  lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true, true, true, true),
+		multi:  lipgloss.NewStyle().Border(lipgloss.RoundedBorder(), true, true, true, true),
 	}
 
 	// // do we need to pre-define these, or build them on the fly?
