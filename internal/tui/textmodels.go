@@ -69,6 +69,8 @@ func (t textinputModel) View() tea.View {
 		slog.Debug("textinput temporarily bumping width",
 			"from", origWidth,
 			"to", t.minWidth,
+			"content", fmt.Sprintf("[%s]", t.Value()),
+			"placeholder", fmt.Sprintf("[%s]", t.Placeholder),
 		)
 		t.Model.SetWidth(t.minWidth)
 	}
@@ -447,7 +449,8 @@ func (t textModel) SetMinWidth(width int) textModel {
 	t2 := t.clone()
 
 	if !t.isArea {
-		t2.input.SetMinWidth(width)
+		// We implement SetMinWidth immutably, so we have to save back the model
+		t2.input = t2.input.SetMinWidth(width)
 	} else {
 		// nop!
 		slog.Warn("textModel area cannot SetMinWidth")

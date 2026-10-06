@@ -11,34 +11,43 @@ func TestCalculateSizes(t *testing.T) {
 	// The input/output structures are bulky, so we pre-define some named base
 	// cases, and we trust TestShrinkableDimension to handle a lot of the header
 	// width nuance
-	baseConstraints := layoutConstraints{
-		maxWidth:     40,
-		maxHeight:    20,
-		focus:        typeField,
-		typeWidth:    dimension{0, 3, 10},
-		scopeWidth:   dimension{0, 0, 10},
-		descWidth:    dimension{0, 5, 20},
-		bodyWidth:    dimension{0, 0, 40},
-		bodyHeight:   dimension{0, 0, -1},
-		footerWidth:  dimension{0, 0, 20},
-		footerHeight: dimension{0, 0, -1},
+	baseBounds := Size{40, 20}
+	baseLimits := FieldVals[Limits]{
+		typeWidth:    Limits{3, 10},
+		scopeWidth:   Limits{0, 10},
+		descWidth:    Limits{5, 20},
+		bodyWidth:    Limits{0, 40},
+		bodyHeight:   Limits{0, 0},
+		footerWidth:  Limits{0, 20},
+		footerHeight: Limits{0, 0},
 	}
 
-	baseExpected := layoutOutput{
-		typeWidth:    4, // min+focus
-		scopeWidth:   0,
-		descWidth:    21,
-		bodyWidth:    38,
-		bodyHeight:   4,
-		footerWidth:  20,
-		footerHeight: 2,
+	baseContents := FieldVals[Contents]{
+		typeWidth:    Contents{0},
+		scopeWidth:   Contents{0},
+		descWidth:    Contents{0},
+		bodyWidth:    Contents{0},
+		bodyHeight:   Contents{0},
+		footerWidth:  Contents{0},
+		footerHeight: Contents{0},
+	}
+	baseFocus := typeField
+
+	baseExpected := FieldVals[Limits]{
+		typeWidth:    Limits{3, 4}, // min+focus
+		scopeWidth:   Limits{0, 0},
+		descWidth:    Limits{21, 21},
+		bodyWidth:    Limits{38, 38},
+		bodyHeight:   Limits{4, 4},
+		footerWidth:  Limits{20, 20},
+		footerHeight: Limits{2, 2},
 	}
 
-	actual := calculateSizes(baseConstraints)
+	actual := calculateSizes(baseBounds, baseLimits, baseFocus, baseContents)
 	assert.Equal(t, baseExpected, actual)
 }
 
-func TestShrinkableDimension(t *testing.T) {
+func TestShrinkableLimits(t *testing.T) {
 	for i, c := range []struct {
 		inContent  int
 		inMin      int
@@ -62,13 +71,13 @@ func TestShrinkableDimension(t *testing.T) {
 	} {
 		t.Run(fmt.Sprintf("case %d", i+1), func(t *testing.T) {
 			t.Parallel()
-			actual := shrinkableDimension(dimension{c.inContent, c.inMin, c.inMax}, c.focusExtra)
-			assert.Equal(t, c.expected, actual)
+			actual := shrinkableLimits(Limits{c.inMin, c.inMax}, Contents{c.inContent}, c.focusExtra)
+			assert.Equal(t, Limits{c.inMin, c.expected}, actual)
 		})
 	}
 }
 
-func TestOptionalMin(t *testing.T) {
+func TestMinNonnegative(t *testing.T) {
 	for i, c := range [][]int{
 		// expected is first, remainder are args...
 		{0, 0, 0},

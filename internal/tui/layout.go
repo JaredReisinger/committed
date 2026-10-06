@@ -16,48 +16,63 @@ import (
 // I *think* we can avoid needing to call this on every View() rendering, but as
 // a pure function it would be safe to call if it turns out that's needed.
 
-// Dimension represents the size constraints along a single dimension, either
-// width or height.  We do this because some fields only size in one dimension,
-// because sizing logic doesn't really care about direction as much as
-// constraints, and to simplify the data we need to track.
-type dimension struct {
-	content int
-	min     int
-	max     int // a max of zero mean "no maximum"
+type Size struct {
+	width  int
+	height int
 }
 
-func (d dimension) LogValue() slog.Value {
+func (s Size) LogValue() slog.Value {
 	return slog.GroupValue([]slog.Attr{
-		{Key: "content", Value: slog.IntValue(d.content)},
-		{Key: "min", Value: slog.IntValue(d.min)},
-		{Key: "max", Value: slog.IntValue(d.max)},
+		{Key: "width", Value: slog.IntValue(s.width)},
+		{Key: "height", Value: slog.IntValue(s.height)},
 	}...)
 }
 
-type layoutConstraints struct {
-	maxWidth  int // the bounds, often the containing window
-	maxHeight int
-	focus     field
-
-	// We *could* include the layout chrome here, to fully parameterize the
-	// layout. That might be a future change, to allow users to change the
-	// border styles. For now, though, it's hard-coded in calculateSizes.
-
-	typeWidth    dimension
-	scopeWidth   dimension
-	descWidth    dimension // TODO: add header constraints?
-	bodyWidth    dimension
-	bodyHeight   dimension
-	footerWidth  dimension
-	footerHeight dimension
-	// helpW/H -- TODO?
+// Limits can represent either content Limits or rendering Limits, depending on
+// the context.  If a field should have a fixed size, min and max will be set to
+// the same value. The caller knows enough about the sizing that it can assume
+// and use whichever field it prefers.
+type Limits struct {
+	min int
+	max int // a max of zero mean "no maximum" ... or do we require -1?
 }
 
-func (l layoutConstraints) LogValue() slog.Value {
+func (l Limits) LogValue() slog.Value {
 	return slog.GroupValue([]slog.Attr{
-		{Key: "maxWidth", Value: slog.IntValue(l.maxWidth)},
-		{Key: "maxHeight", Value: slog.IntValue(l.maxHeight)},
-		{Key: "focus", Value: slog.IntValue(int(l.focus))},
+		{Key: "min", Value: slog.IntValue(l.min)},
+		{Key: "max", Value: slog.IntValue(l.max)},
+	}...)
+}
+
+// Contents represents the actual content length, or the nominal (for
+// placeholders).  I'm not 100% sure I need the nominal, though. The one case
+// where it might make sense is in the header where a placeholder really
+// shouldn't count as size... but that may be overkill.
+type Contents struct {
+	actual int
+	// nominal int
+}
+
+func (c Contents) LogValue() slog.Value {
+	return slog.GroupValue([]slog.Attr{
+		{Key: "actual", Value: slog.IntValue(c.actual)},
+		// {Key: "nominal", Value: slog.IntValue(c.nominal)},
+	}...)
+}
+
+// FieldVals are the relevant limits/contents for each field.
+type FieldVals[T slog.LogValuer] struct {
+	typeWidth    T
+	scopeWidth   T
+	descWidth    T // TODO: add header constraints?
+	bodyWidth    T
+	bodyHeight   T
+	footerWidth  T
+	footerHeight T
+}
+
+func (l FieldVals[T]) LogValue() slog.Value {
+	return slog.GroupValue([]slog.Attr{
 		{Key: "typeWidth", Value: l.typeWidth.LogValue()},
 		{Key: "scopeWidth", Value: l.scopeWidth.LogValue()},
 		{Key: "descWidth", Value: l.descWidth.LogValue()},
@@ -68,36 +83,14 @@ func (l layoutConstraints) LogValue() slog.Value {
 	}...)
 }
 
-// same fields as the constraints, boiled down to a single number
-type layoutOutput struct {
-	typeWidth    int
-	scopeWidth   int
-	descWidth    int
-	bodyWidth    int
-	bodyHeight   int
-	footerWidth  int
-	footerHeight int
-}
+// calculateSizes takes the content limits and contents themselves, and returns
+// the rendering limits for the fields.
+func calculateSizes(bounds Size, limits FieldVals[Limits], focus field, contents FieldVals[Contents]) FieldVals[Limits] {
+	slog.Debug("calculateSize", "width", bounds.width, "height", bounds.height)
 
-func (l layoutOutput) LogValue() slog.Value {
-	return slog.GroupValue([]slog.Attr{
-		{Key: "typeWidth", Value: slog.IntValue(l.typeWidth)},
-		{Key: "scopeWidth", Value: slog.IntValue(l.scopeWidth)},
-		{Key: "descWidth", Value: slog.IntValue(l.descWidth)},
-		{Key: "bodyWidth", Value: slog.IntValue(l.bodyWidth)},
-		{Key: "bodyHeight", Value: slog.IntValue(l.bodyHeight)},
-		{Key: "footerWidth", Value: slog.IntValue(l.footerWidth)},
-		{Key: "footerHeight", Value: slog.IntValue(l.footerHeight)},
-	}...)
-}
-
-func calculateSizes(in layoutConstraints) layoutOutput {
-	slog.Debug("calculateSize", "maxWidth", in.maxWidth, "maxHeight", in.maxHeight)
-
-	// The first thing we do is calculate how to distribute the height.
 	// Graphically, the UI looks like:
 	//
-	// outer window...
+	// (bounds is outer maximum...)
 	// ┌────────────────────────────────────────────────────────────────────┐
 	// │ (blank line for cleanliness)                                       │
 	// │ <type>(<scope>): description                                       │
@@ -141,11 +134,11 @@ func calculateSizes(in layoutConstraints) layoutOutput {
 	// calculate this from the minimum needed size for each field.
 	const headerHeight = 1
 
-	minBodyHeight := in.bodyHeight.min
+	minBodyHeight := limits.bodyHeight.min
 	if minBodyHeight <= 0 {
 		minBodyHeight = 4 // subjective default
 	}
-	minFooterHeight := in.footerHeight.min
+	minFooterHeight := limits.footerHeight.min
 	if minFooterHeight <= 0 {
 		minFooterHeight = 2 // subjective default
 	}
@@ -153,73 +146,97 @@ func calculateSizes(in layoutConstraints) layoutOutput {
 	// body and footer cay layout anywhere that the header can, width-wise
 	const minHeaderWidth = 7 + 1 + 7 + 3 + 12 // type "(" scope "): " desc
 
-	maxWidth := max(in.maxWidth, chromeWidth+minHeaderWidth)
-	maxHeight := max(in.maxHeight, chromeHeight+headerHeight+minBodyHeight+minFooterHeight+helpHeight)
+	maxWidth := max(bounds.width, chromeWidth+minHeaderWidth)
+	maxHeight := max(bounds.height, chromeHeight+headerHeight+minBodyHeight+minFooterHeight+helpHeight)
 
 	// The sizing is *highly* dependent on which field we're calculating, and
 	// some fields' size depends on what we have/calculate for other fields.
-	var out layoutOutput
+	var out FieldVals[Limits]
 
-	// We actually lay out the body (and footer) first, as we might use the body
+	// We actually lay out the body (and footer) first, as we *might* use the body
 	// width when calculating the header/description to give it a default
 	// maximum width (to prevent it from looking like it expands as you type).
-	out.bodyWidth = minNonNegative(max(maxWidth-chromeWidth, in.bodyWidth.min), in.bodyWidth.max)
-	bodyHeight := in.bodyHeight
+	out.bodyWidth.min = minNonNegative(max(maxWidth-chromeWidth, limits.bodyWidth.min), limits.bodyWidth.max)
+	out.bodyWidth.max = out.bodyWidth.min
+	bodyHeight := limits.bodyHeight
 	bodyHeight.min = max(bodyHeight.min, minBodyHeight)
 	bodyHeight.max = minNonNegative(
 		maxHeight-chromeHeight-headerHeight-minFooterHeight-helpHeight,
 		bodyHeight.max,
 	)
-	out.bodyHeight = shrinkableDimension(bodyHeight, false)
+	out.bodyHeight = shrinkableLimits(bodyHeight, contents.bodyHeight, false)
 
-	out.footerWidth = minNonNegative(max(maxWidth-chromeWidth, in.footerWidth.min), in.footerWidth.max)
-	footerHeight := in.footerHeight
+	out.footerWidth.min = minNonNegative(
+		max(maxWidth-chromeWidth, limits.footerWidth.min),
+		maxNormalizer(limits.footerWidth.max),
+	)
+	out.footerWidth.max = out.footerWidth.min
+	footerHeight := limits.footerHeight
 	footerHeight.min = max(footerHeight.min, minFooterHeight)
 	footerHeight.max = minNonNegative(
-		maxHeight-chromeHeight-headerHeight-out.bodyHeight-helpHeight,
-		footerHeight.max,
+		maxHeight-chromeHeight-headerHeight-out.bodyHeight.max-helpHeight,
+		maxNormalizer(footerHeight.max),
 	)
-	out.footerHeight = shrinkableDimension(footerHeight, false)
+	out.footerHeight = shrinkableLimits(footerHeight, contents.footerHeight, false)
 
 	// Note that the *form* is responsible for accounting for the placeholders
-	out.typeWidth = shrinkableDimension(in.typeWidth, in.focus == typeField)
-	out.scopeWidth = shrinkableDimension(in.scopeWidth, in.focus == scopeField)
+	out.typeWidth = shrinkableLimits(limits.typeWidth, contents.typeWidth, focus == typeField)
+	out.scopeWidth = shrinkableLimits(limits.scopeWidth, contents.scopeWidth, focus == scopeField)
 
 	// calculate chrome in header line
 	headerChromeWidth := chromeWidth + 2 // always start with initial space, trailing space, and ": "
-	if out.scopeWidth > 0 {
+	if out.scopeWidth.max > 0 {
 		headerChromeWidth += 2 // add "()"
 	}
 	// the description isn't "shrinkable..."
-	// slog.Info("desc", "outer", maxWidth, "remaining", maxWidth-headerChromeWidth-out.typeWidth-out.scopeWidth, "max", in.descWidth.max+1)
-	if in.descWidth.max < 0 {
-		in.descWidth.max = out.bodyWidth - out.typeWidth - out.scopeWidth - 1 // account extra 1 for focus (added below...)
-		if out.scopeWidth > 0 {
-			in.descWidth.max -= 2 // account for "()"
+	// slog.Info("desc", "outer", maxWidth, "remaining", maxWidth-headerChromeWidth-out.typeWidth-out.scopeWidth, "max", limits.descWidth.max+1)
+	descWidthMax := limits.descWidth.max
+	if descWidthMax <= 0 {
+		descWidthMax = out.bodyWidth.max - out.typeWidth.max - out.scopeWidth.max - 1 // account extra 1 for focus (added below...)
+		if out.scopeWidth.max > 0 {
+			limits.descWidth.max -= 2 // account for "()"
 		}
 	}
 
-	out.descWidth = minNonNegative(
-		maxWidth-headerChromeWidth-out.typeWidth-out.scopeWidth,
-		in.descWidth.max+1, // it doesn't shrink, so *always* allow 1 for focus
+	out.descWidth.min = minNonNegative(
+		maxWidth-headerChromeWidth-out.typeWidth.max-out.scopeWidth.max,
+		descWidthMax+1, // it doesn't shrink, so *always* allow 1 for focus
 	)
+	out.descWidth.max = out.descWidth.min
 
 	return out
 }
 
-// shrinkableDimension calculates the measurement needed for a field that's
+// shrinkableLimits calculates the measurement needed for a field that's
 // allowed to shrink; often used to make a field "content-sized" when it doesn't
-// have focus.
-func shrinkableDimension(in dimension, needFocusExtra bool) int {
+// have focus. The returned value is intended to
+func shrinkableLimits(limits Limits, contents Contents, needFocusExtra bool) Limits {
 	focusExtra := 0
 	if needFocusExtra {
 		focusExtra = 1
 	}
 
-	return minNonNegative(
-		max(in.content, in.min)+focusExtra,
-		in.max,
+	var out Limits
+
+	out.min = limits.min
+	out.max = minNonNegative(
+		max(contents.actual, limits.min)+focusExtra,
+		maxNormalizer(limits.max),
 	)
+
+	return out
+}
+
+// maxNormalizer helps with some logic (shrinkableLimits) where we want zero
+// values for max to be treated as "unset" (because a max would never truly be
+// zero, and because zero is the Zero value), and that logic is agnostic about
+// the numbers... a *content* zero is a true zero, after all.  We don't want
+// callers to have to know to treat "unset max" specially, so we do it here.
+func maxNormalizer(max int) int {
+	if max == 0 {
+		return -1
+	}
+	return max
 }
 
 func minNonNegative(vals ...int) int {

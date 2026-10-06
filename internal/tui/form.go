@@ -45,7 +45,10 @@ type mainForm struct {
 	winHeight     int
 	bodyMaxHeight int
 	help          help.Model
-	err           error // should this be validation error(s) as well?
+
+	limits FieldVals[Limits]
+
+	err error // should this be validation error(s) as well?
 }
 
 // newModel creates a new TUI model with the given configuration and optional
@@ -71,6 +74,17 @@ func newModel(cfg *config.Config, existingMsg *commit.Message) mainForm {
 	help.ShowAll = true
 	help.SetWidth(80) // ??
 
+	// get field limits from configuration
+	limits := FieldVals[Limits]{
+		typeWidth:    Limits{cfg.TypeMinLength.GetValue(0), cfg.TypeMaxLength.GetValue(0)},
+		scopeWidth:   Limits{cfg.ScopeMinLength.GetValue(0), cfg.ScopeMaxLength.GetValue(0)},
+		descWidth:    Limits{cfg.SubjectMinLength.GetValue(0), cfg.SubjectMaxLength.GetValue(0)},
+		bodyWidth:    Limits{cfg.BodyMinLength.GetValue(0), cfg.BodyMaxLineLength.GetValue(0)},
+		bodyHeight:   Limits{4, 0}, // ?? really?
+		footerWidth:  Limits{cfg.FooterMinLength.GetValue(0), cfg.FooterMaxLineLength.GetValue(0)},
+		footerHeight: Limits{1, 0}, // ?? really?
+	}
+
 	form := mainForm{
 		config:       cfg,
 		existingMsg:  existingMsg,
@@ -85,17 +99,18 @@ func newModel(cfg *config.Config, existingMsg *commit.Message) mainForm {
 		// pure-display component.)
 
 		children: teautil.NewRouter(map[field]tea.Model{
-			typeField:        newTextModel(false, "type", initialType),
+			typeField:        newTextModel(false, "type", initialType).SetCharLimit(limits.typeWidth.max),
 			typeList:         newListModel(cfg.Rules.TypeEnum.Value),
-			scopeField:       newTextModel(false, "scope", initialScope),
-			descriptionField: newTextModel(false, "description", initialDesc),
-			bodyField:        newTextModel(true, "message body", initialBody).SetMinHeight(6).SetDynamicHeight(true).SetMaxContentHeight(1000),
-			footerField:      newTextModel(true, "footer", initialFooter).SetMinHeight(2).SetDynamicHeight(true),
+			scopeField:       newTextModel(false, "scope", initialScope).SetCharLimit(limits.scopeWidth.max),
+			descriptionField: newTextModel(false, "description", initialDesc).SetCharLimit(limits.descWidth.max),
+			bodyField:        newTextModel(true, "message body", initialBody).SetDynamicHeight(true), //.SetMinHeight(6).SetDynamicHeight(true).SetMaxContentHeight(1000),
+			footerField:      newTextModel(true, "footer", initialFooter).SetDynamicHeight(true),     //.SetMinHeight(2).SetDynamicHeight(true),
 		}),
 
 		fieldErrs: make(map[field]error, maxField),
 
-		help: help,
+		help:   help,
+		limits: limits,
 	}
 
 	// perform initial validation?
@@ -109,24 +124,24 @@ func newModel(cfg *config.Config, existingMsg *commit.Message) mainForm {
 	return form
 }
 
-func maxTypeLength(cfg *config.Config) int {
-	if cfg.Rules.TypeMaxLength.Active() {
-		return cfg.Rules.TypeMaxLength.Value
-	}
+// func maxTypeLength(cfg *config.Config) int {
+// 	if cfg.Rules.TypeMaxLength.Active() {
+// 		return cfg.Rules.TypeMaxLength.Value
+// 	}
 
-	if cfg.Rules.TypeEnum.Set {
-		maxTyp := 0
-		for _, t := range cfg.Rules.TypeEnum.Value {
-			w := len(t)
-			if w > maxTyp {
-				maxTyp = w
-			}
-		}
-		return maxTyp
-	}
+// 	if cfg.Rules.TypeEnum.Set {
+// 		maxTyp := 0
+// 		for _, t := range cfg.Rules.TypeEnum.Value {
+// 			w := len(t)
+// 			if w > maxTyp {
+// 				maxTyp = w
+// 			}
+// 		}
+// 		return maxTyp
+// 	}
 
-	return 10 // ?
-}
+// 	return 10 // ?
+// }
 
 // Init initializes the bubbletea program.
 func (form mainForm) Init() tea.Cmd {
@@ -294,106 +309,44 @@ func (form mainForm) resize(winWidth int, winHeight int) mainForm {
 	body := form.children.MustGet(bodyField).(textModel)
 	footer := form.children.MustGet(footerField).(textModel)
 
-	cfg := form.config
+	// cfg := form.config
 
 	// Set up the calculateSizes structure... could we cache a lot of this?
 	// Might need to alter the constraints to not include current content size.
 	// NOTE... no good way to get count of current body lines...
-
-	constraints := layoutConstraints{
-		maxWidth:     winWidth,
-		maxHeight:    winHeight,
-		focus:        form.focusedField,
-		typeWidth:    dimension{nominalLength(typ, true), cfg.TypeMinLength.GetValue(0), cfg.TypeMaxLength.GetValue(-1)},
-		scopeWidth:   dimension{nominalLength(scope, form.focusedField == scopeField), cfg.ScopeMinLength.GetValue(0), cfg.ScopeMaxLength.GetValue(-1)},
-		descWidth:    dimension{nominalLength(desc, true), cfg.SubjectMinLength.GetValue(0), cfg.SubjectMaxLength.GetValue(-1)},
-		bodyWidth:    dimension{nominalLength(body, true), cfg.BodyMinLength.GetValue(0), cfg.BodyMaxLineLength.GetValue(-1)},
-		bodyHeight:   dimension{0, 4, -1},
-		footerWidth:  dimension{nominalLength(footer, true), cfg.FooterMinLength.GetValue(0), cfg.FooterMaxLineLength.GetValue(-1)},
-		footerHeight: dimension{0, 2, -1},
+	contents := FieldVals[Contents]{
+		typeWidth:    Contents{nominalLength(typ, true)},
+		scopeWidth:   Contents{nominalLength(scope, form.focusedField == scopeField)},
+		descWidth:    Contents{nominalLength(desc, true)},
+		bodyWidth:    Contents{nominalLength(body, true)},
+		bodyHeight:   Contents{0},
+		footerWidth:  Contents{nominalLength(footer, true)},
+		footerHeight: Contents{0},
 	}
 
-	// shoehorn in max type size... this should happen differently...
-	if constraints.typeWidth.max == -1 {
-		constraints.typeWidth.max = maxTypeLength(cfg)
-	}
+	// // shoehorn in max type size... this should happen differently...
+	// if constraints.typeWidth.max == -1 {
+	// 	constraints.typeWidth.max = maxTypeLength(cfg)
+	// }
 
-	sizes := calculateSizes(constraints)
+	bounds := Size{form.winWidth, form.winHeight}
+	sizes := calculateSizes(bounds, form.limits, form.focusedField, contents)
 	slog.Info("resize",
-		"constraints", constraints.LogValue(),
+		"bounds", bounds.LogValue(),
+		"limits", form.limits.LogValue(),
+		"contents", contents.LogValue(),
 		"sizes", sizes.LogValue(),
 	)
 
-	typ = typ.SetMinWidth(10)
-	// typ = typ.SetWidth(sizes.typeWidth)
-	// scope = scope.SetWidth(sizes.scopeWidth) // should we be setting max instead?
-	desc = desc.SetWidth(sizes.descWidth)
+	typ = typ.SetMinWidth(sizes.typeWidth.min).SetMaxWidth(sizes.typeWidth.max)
+	scope = scope.SetMinWidth(sizes.scopeWidth.min).SetMaxWidth(sizes.scopeWidth.max)
+	desc = desc.SetMinWidth(sizes.descWidth.min).SetWidth(sizes.descWidth.max)
 
-	body = body.SetWidth(sizes.bodyWidth)
-	// how do we want to do height?
-	footer = footer.SetWidth(sizes.footerWidth)
-	// how do we want to do height?
+	// body and footer widths are *not* dynamic
+	body = body.SetWidth(sizes.bodyWidth.max).SetMinHeight(sizes.bodyHeight.min).SetMaxHeight(sizes.bodyHeight.max)
+	footer = footer.SetWidth(sizes.footerWidth.max).SetMinHeight(sizes.footerHeight.min).SetMaxHeight(sizes.footerHeight.max)
 
 	form.help.SetWidth(winWidth) // this *should* return an updated model!
-
-	// // We're going to manage the field borders separate from the text controls
-	// // because textarea has some rendering challenges with doubling borders with
-	// // an empty field.  For now, we're calc'ing 2x and 2y for borders...
-
-	// // bw := 2 // border width?
-	// bh := 2 // border height?
-
-	// form.help.SetWidth(winWidth)
-
-	// maxTyp := maxTypeLength(cfg) // do we calculate this every time?
-	// typ = typ.SetCharLimit(maxTyp)
-	// typ = typ.SetWidth(maxTyp + 1) // +1 for cursor
-
-	// if cfg.ScopeMaxLength.Active() {
-	// 	scope = scope.SetWidth(10)                                               // soft limit for rendering? or let it grow?
-	// 	scope = scope.SetCharLimit(min(cfg.ScopeMaxLength.Value+1, math.MaxInt)) // +1 for cursor
-	// } else {
-	// 	scope = scope.SetWidth(10) // soft limit for rendering? or let it grow?
-	// }
-
-	// // header is entire first line... we don't set sizes based on that...
-	// if cfg.Rules.SubjectMaxLength.Active() {
-	// 	descLimit := cfg.Rules.SubjectMaxLength.Value
-	// 	slog.Debug("setting description limit", "subjMax", descLimit, "typeMax", maxTyp)
-
-	// 	desc = desc.SetCharLimit(descLimit)
-	// 	desc = desc.SetWidth(min(descLimit+1, winWidth-typ.Width())) // +1 for cursor
-	// }
-	// // do we have an "else"?
-
-	// if cfg.Rules.BodyMaxLineLength.Active() {
-	// 	body = body.SetWidth(min(cfg.Rules.BodyMaxLineLength.Value, winWidth))
-	// }
-	// helpHeight := 8
-	// form.bodyMaxHeight = winHeight - typ.Height() - bh - bh - helpHeight - 1 - 2 // -2 for fudging
-	// body = body.SetMaxHeight(form.bodyMaxHeight)
-
-	// if body.DynamicHeight() && body.Height() >= form.bodyMaxHeight {
-	// 	body = body.SetDynamicHeight(false)
-	// 	// body = body.SetMaxHeight(0)
-	// 	body = body.SetHeight(form.bodyMaxHeight)
-	// } else if body.Height() > form.bodyMaxHeight {
-	// 	body = body.SetHeight(form.bodyMaxHeight)
-	// } else {
-	// 	// bubbletea text doesn't expose its internal visual height value
-	// 	textHeight := strings.Count(commit.Wrap(body.Value(), body.Width()), "\n")
-	// 	body = body.SetDynamicHeight(textHeight < form.bodyMaxHeight)
-	// 	// body = body.SetHeight(max(6, textHeight))
-	// 	body = body.SetMaxHeight(form.bodyMaxHeight)
-	// }
-
-	// footWidth := body.Width()
-	// if cfg.Rules.FooterMaxLineLength.Active() {
-	// 	footWidth = cfg.Rules.FooterMaxLineLength.Value
-	// }
-	// footer = footer.SetWidth(min(footWidth, winWidth))
-
-	// form.help.SetWidth(winWidth)
 
 	form.children = form.children.SetMap(map[field]tea.Model{
 		typeField:        typ,
@@ -414,6 +367,7 @@ func nominalLength(t textModel, considerPlaceholder bool) int {
 		val = t.Placeholder()
 	}
 
+	slog.Debug("nominalLength", "val", val, "length", len(val))
 	return len(val)
 }
 
@@ -589,10 +543,10 @@ func (form mainForm) View() tea.View {
 	for f, child := range form.children.All() {
 		var info info
 
-		// t, ok := child.(textModel)
-		// if ok {
-		// 	slog.Warn("getting child view content", "child", f, "width", t.Width())
-		// }
+		t, ok := child.(textModel)
+		if ok {
+			slog.Warn("getting child view content", "child", f, "width", t.Width(), "minWidth", t.MinWidth(), "content", t.Value())
+		}
 
 		info.view = child.View().Content
 		// if t, ok := child.(textModel); ok && f <= descriptionField {
