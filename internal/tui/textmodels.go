@@ -164,7 +164,16 @@ func (t textareaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (t textareaModel) View() tea.View {
-	return tea.NewView(t.Model.View())
+	// textarea doesn't always render up to its minimum height?
+	view := t.Model.View()
+	_, h := lipgloss.Size(view)
+	if h < t.Model.MinHeight {
+		slog.Warn("textarea rendering too short", "minHeight", t.Model.MinHeight, "renderedHeight", h, "view", view)
+		view = lipgloss.NewStyle().PaddingBottom(t.Model.MinHeight - h).Render(view)
+	} else {
+		slog.Debug("textarea rendering OK", "minHeight", t.Model.MinHeight, "renderedHeight", h, "view", view)
+	}
+	return tea.NewView(view)
 }
 
 // ===== textModel ============================================================

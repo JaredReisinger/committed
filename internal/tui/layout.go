@@ -142,12 +142,13 @@ func calculateSizes(bounds Size, limits FieldVals[Limits], focus field, contents
 	if minFooterHeight <= 0 {
 		minFooterHeight = 2 // subjective default
 	}
+	minErrorHeight := 2
 
 	// body and footer cay layout anywhere that the header can, width-wise
 	const minHeaderWidth = 7 + 1 + 7 + 3 + 12 // type "(" scope "): " desc
 
 	maxWidth := max(bounds.width, chromeWidth+minHeaderWidth)
-	maxHeight := max(bounds.height, chromeHeight+headerHeight+minBodyHeight+minFooterHeight+helpHeight)
+	maxHeight := max(bounds.height, chromeHeight+headerHeight+minBodyHeight+minFooterHeight+minErrorHeight+helpHeight)
 
 	// The sizing is *highly* dependent on which field we're calculating, and
 	// some fields' size depends on what we have/calculate for other fields.
@@ -161,10 +162,11 @@ func calculateSizes(bounds Size, limits FieldVals[Limits], focus field, contents
 	bodyHeight := limits.bodyHeight
 	bodyHeight.min = max(bodyHeight.min, minBodyHeight)
 	bodyHeight.max = minNonNegative(
-		maxHeight-chromeHeight-headerHeight-minFooterHeight-helpHeight,
-		bodyHeight.max,
+		maxHeight-chromeHeight-headerHeight-minFooterHeight-minErrorHeight-helpHeight,
+		maxNormalizer(bodyHeight.max),
 	)
-	out.bodyHeight = shrinkableLimits(bodyHeight, contents.bodyHeight, false)
+	// out.bodyHeight = shrinkableLimits(bodyHeight, contents.bodyHeight, false)
+	out.bodyHeight = bodyHeight
 
 	out.footerWidth.min = minNonNegative(
 		max(maxWidth-chromeWidth, limits.footerWidth.min),
@@ -174,10 +176,11 @@ func calculateSizes(bounds Size, limits FieldVals[Limits], focus field, contents
 	footerHeight := limits.footerHeight
 	footerHeight.min = max(footerHeight.min, minFooterHeight)
 	footerHeight.max = minNonNegative(
-		maxHeight-chromeHeight-headerHeight-out.bodyHeight.max-helpHeight,
+		maxHeight-chromeHeight-headerHeight-out.bodyHeight.max-minErrorHeight-helpHeight,
 		maxNormalizer(footerHeight.max),
 	)
-	out.footerHeight = shrinkableLimits(footerHeight, contents.footerHeight, false)
+	// out.footerHeight = shrinkableLimits(footerHeight, contents.footerHeight, false)
+	out.footerHeight = footerHeight
 
 	// Note that the *form* is responsible for accounting for the placeholders
 	out.typeWidth = shrinkableLimits(limits.typeWidth, contents.typeWidth, focus == typeField)

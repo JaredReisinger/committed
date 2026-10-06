@@ -22,7 +22,7 @@ const (
 	typeField field = iota
 	typeList
 	scopeField
-	descriptionField
+	descField
 	bodyField
 	footerField
 	// help?
@@ -99,12 +99,12 @@ func newModel(cfg *config.Config, existingMsg *commit.Message) mainForm {
 		// pure-display component.)
 
 		children: teautil.NewRouter(map[field]tea.Model{
-			typeField:        newTextModel(false, "type", initialType).SetCharLimit(limits.typeWidth.max),
-			typeList:         newListModel(cfg.Rules.TypeEnum.Value),
-			scopeField:       newTextModel(false, "scope", initialScope).SetCharLimit(limits.scopeWidth.max),
-			descriptionField: newTextModel(false, "description", initialDesc).SetCharLimit(limits.descWidth.max),
-			bodyField:        newTextModel(true, "message body", initialBody).SetDynamicHeight(true), //.SetMinHeight(6).SetDynamicHeight(true).SetMaxContentHeight(1000),
-			footerField:      newTextModel(true, "footer", initialFooter).SetDynamicHeight(true),     //.SetMinHeight(2).SetDynamicHeight(true),
+			typeField:   newTextModel(false, "type", initialType).SetCharLimit(limits.typeWidth.max),
+			typeList:    newListModel(cfg.Rules.TypeEnum.Value),
+			scopeField:  newTextModel(false, "scope", initialScope).SetCharLimit(limits.scopeWidth.max),
+			descField:   newTextModel(false, "description", initialDesc).SetCharLimit(limits.descWidth.max),
+			bodyField:   newTextModel(true, "message body", initialBody).SetMaxContentHeight(100).SetDynamicHeight(true),
+			footerField: newTextModel(true, "footer", initialFooter).SetMaxContentHeight(50),
 		}),
 
 		fieldErrs: make(map[field]error, maxField),
@@ -123,25 +123,6 @@ func newModel(cfg *config.Config, existingMsg *commit.Message) mainForm {
 
 	return form
 }
-
-// func maxTypeLength(cfg *config.Config) int {
-// 	if cfg.Rules.TypeMaxLength.Active() {
-// 		return cfg.Rules.TypeMaxLength.Value
-// 	}
-
-// 	if cfg.Rules.TypeEnum.Set {
-// 		maxTyp := 0
-// 		for _, t := range cfg.Rules.TypeEnum.Value {
-// 			w := len(t)
-// 			if w > maxTyp {
-// 				maxTyp = w
-// 			}
-// 		}
-// 		return maxTyp
-// 	}
-
-// 	return 10 // ?
-// }
 
 // Init initializes the bubbletea program.
 func (form mainForm) Init() tea.Cmd {
@@ -164,13 +145,8 @@ func setFocusCmd(f field) tea.Cmd {
 // Update handles user input and updates the model.
 func (form mainForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd // aggregated commands
-	var cmd tea.Cmd
-	handled := false // do we do this, or msg = nil?
-
-	// // The message might be a wrapped message intended for a target model, *or*
-	// // it might be a generic/unhandled message that go to the focused model. We
-	// // de-duplicate that logic.
-	// targetModel := m.focusedField
+	var cmd tea.Cmd    // returned Cmd from delgated Update() calls
+	handled := false
 
 	switch msgT := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -180,12 +156,11 @@ func (form mainForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case setFocusMsg:
 		// If the focus *was* type or scope, we need to play some positioning
 		// tricks to ensure the field isn't scrolled weirdly.
-
-		// switch form.focusedField {
-		// case typeField, scopeField:
-		// 	t2 := form.children.MustGet(form.focusedField).(textModel).MoveToBegin().MoveToEnd()
-		// 	form.children = form.children.Set(form.focusedField, t2)
-		// }
+		switch form.focusedField {
+		case typeField, scopeField:
+			t2 := form.children.MustGet(form.focusedField).(textModel).MoveToBegin().MoveToEnd()
+			form.children = form.children.Set(form.focusedField, t2)
+		}
 
 		form, cmd = form.setFocus(msgT.field)
 		cmds = append(cmds, cmd)
@@ -194,6 +169,11 @@ func (form mainForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		handled = true
 
 	case teautil.WrappedMsg[field]:
+		// Our teautil.Router doesn't have a mechanism for child models to
+		// "broadcast up" messages for the parent, but we *can* inspect any
+		// wrapped messages and look for the ones we care about. This has the
+		// added benefit of telling us which model sent the message (via the
+		// Key), which can be important to know.
 		switch innerMsg := msgT.Msg.(type) {
 		case listSelectionChangedMsg:
 			if msgT.Key == typeList {
@@ -248,46 +228,9 @@ func (form mainForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// delegate other messages to the field/model with focus...
 	if !handled {
 		var cmd tea.Cmd
-
-		// if form.focusedField == typeField {
-		// 	var typeList tea.Model
-		// 	typeList, cmd = form.typeList.Update(msg)
-		// 	form.typeList = typeList.(listModel)
-		// } else {
 		form.children, cmd = form.children.Update(msg, form.focusedField)
-		// }
-
-		// m.textareas, cmd = m.textareas.Update(msg, targetModel)
 		cmds = append(cmds, cmd)
-
-		// TODO: the resize logic should be in control of returning the "should
-		// the body be dynamic or not" values.
-		//
-		// If the focused field is the body, check for dynamic->fixed size
-		// changing
-		if form.focusedField == bodyField {
-			body := form.children.MustGet(bodyField).(textModel)
-			if body.DynamicHeight() && body.Height() >= form.bodyMaxHeight {
-				body = body.SetDynamicHeight(false)
-				// body = body.SetMaxHeight(0)
-				body = body.SetHeight(form.bodyMaxHeight)
-			} else if body.Height() > form.bodyMaxHeight {
-				body = body.SetHeight(form.bodyMaxHeight)
-			} else {
-				// bubbletea text doesn't expose its internal visual height value
-				textHeight := strings.Count(commit.Wrap(body.Value(), body.Width()), "\n")
-				body = body.SetDynamicHeight(textHeight < form.bodyMaxHeight)
-				// body = body.SetHeight(max(6, textHeight))
-				body = body.SetMaxHeight(form.bodyMaxHeight)
-			}
-			form.children = form.children.Set(bodyField, body)
-		}
 	}
-
-	// // Clear any previous validation errors when user types
-	// if m.err != nil && (m.focusedField == summaryField || m.focusedField == detailsField) {
-	// 	m.err = nil
-	// }
 
 	return form, tea.Batch(cmds...)
 }
@@ -305,11 +248,9 @@ func (form mainForm) resize(winWidth int, winHeight int) mainForm {
 	typ := form.children.MustGet(typeField).(textModel)
 	// TODO: size typeList field here as well!
 	scope := form.children.MustGet(scopeField).(textModel)
-	desc := form.children.MustGet(descriptionField).(textModel)
+	desc := form.children.MustGet(descField).(textModel)
 	body := form.children.MustGet(bodyField).(textModel)
 	footer := form.children.MustGet(footerField).(textModel)
-
-	// cfg := form.config
 
 	// Set up the calculateSizes structure... could we cache a lot of this?
 	// Might need to alter the constraints to not include current content size.
@@ -324,11 +265,6 @@ func (form mainForm) resize(winWidth int, winHeight int) mainForm {
 		footerHeight: Contents{0},
 	}
 
-	// // shoehorn in max type size... this should happen differently...
-	// if constraints.typeWidth.max == -1 {
-	// 	constraints.typeWidth.max = maxTypeLength(cfg)
-	// }
-
 	bounds := Size{form.winWidth, form.winHeight}
 	sizes := calculateSizes(bounds, form.limits, form.focusedField, contents)
 	slog.Info("resize",
@@ -342,18 +278,18 @@ func (form mainForm) resize(winWidth int, winHeight int) mainForm {
 	scope = scope.SetMinWidth(sizes.scopeWidth.min).SetMaxWidth(sizes.scopeWidth.max)
 	desc = desc.SetMinWidth(sizes.descWidth.min).SetWidth(sizes.descWidth.max)
 
-	// body and footer widths are *not* dynamic
+	// body and footer widths are *not* dynamic, but the heights are
 	body = body.SetWidth(sizes.bodyWidth.max).SetMinHeight(sizes.bodyHeight.min).SetMaxHeight(sizes.bodyHeight.max)
 	footer = footer.SetWidth(sizes.footerWidth.max).SetMinHeight(sizes.footerHeight.min).SetMaxHeight(sizes.footerHeight.max)
 
 	form.help.SetWidth(winWidth) // this *should* return an updated model!
 
 	form.children = form.children.SetMap(map[field]tea.Model{
-		typeField:        typ,
-		scopeField:       scope,
-		descriptionField: desc,
-		bodyField:        body,
-		footerField:      footer,
+		typeField:   typ,
+		scopeField:  scope,
+		descField:   desc,
+		bodyField:   body,
+		footerField: footer,
 	})
 
 	return form
@@ -407,7 +343,7 @@ func (form mainForm) validate(f field, value string) mainForm {
 			minLengthRule:      &form.config.ScopeMinLength,
 		})
 
-	case descriptionField:
+	case descField:
 		err = validate(value, &fieldRules{
 			caseRule:           nil,
 			multiCaseRule:      &form.config.SubjectCase,
@@ -464,12 +400,6 @@ func (form mainForm) setFocus(focusField field) (mainForm, tea.Cmd) {
 	for f := range maxField {
 		if child, ok := form.children.Get(f); ok {
 			c2 := child
-			// // This is okay, but I think I really want to update the value *as*
-			// // the selection changes...
-			// if f == typeField && form.focusedField == typeField {
-			// 	c2 = c2.SetValue(form.config.Types[form.typeList.getSelectedIndex()]).MoveToEnd()
-			// }
-
 			focuser, ok := c2.(Focuser)
 			if ok {
 				if f == focusField {
@@ -511,18 +441,6 @@ func (form mainForm) prevField() tea.Cmd {
 	return setFocusCmd((form.focusedField + maxField - 1) % maxField)
 }
 
-// // validateDescription checks if the description field meets requirements.
-// func (form mainForm) validateDescription() error {
-// 	// description := strings.TrimSpace(desc.Value())
-// 	// if description == "" {
-// 	// 	return fmt.Errorf("description is required")
-// 	// }
-// 	// if len(description) > m.config.SubjectMaxLength {
-// 	// 	return fmt.Errorf("description must be ≤ %d characters (currently %d)", m.config.SubjectMaxLength, len(description))
-// 	// }
-// 	return nil
-// }
-
 type KeyBinder interface {
 	GetKeyBindings() []key.Binding
 }
@@ -545,19 +463,10 @@ func (form mainForm) View() tea.View {
 
 		t, ok := child.(textModel)
 		if ok {
-			slog.Warn("getting child view content", "child", f, "width", t.Width(), "minWidth", t.MinWidth(), "content", t.Value())
+			slog.Debug("getting child view content", "child", f, "width", t.Width(), "minWidth", t.MinWidth(), "content", t.Value())
 		}
 
 		info.view = child.View().Content
-		// if t, ok := child.(textModel); ok && f <= descriptionField {
-		// 	// textinput adds padding sometimes, which can cause it to render
-		// 	// "width+1", and we're really particular about that.  We have to
-		// 	// double-check and trim it if needed.
-		// 	if lipgloss.Width(info.view) > t.Width() {
-		// 		info.view = lipgloss.NewStyle().MaxWidth(t.Width()).Render(info.view)
-		// 	}
-		// }
-
 		info.valid = form.fieldErrs[f] == nil
 
 		// Figure out the decorator; depends on whether the field is valid, etc.
@@ -585,7 +494,7 @@ func (form mainForm) View() tea.View {
 		border := kindDecorations[childKind].BorderForeground(defaultColors[childStatus][childState][decoration])
 
 		switch f {
-		case typeField, scopeField, descriptionField:
+		case typeField, scopeField, descField:
 			if form.focusedField >= bodyField {
 				border = border.UnsetBorderBottom()
 			}
@@ -654,7 +563,7 @@ func (form mainForm) View() tea.View {
 		lipgloss.Top,
 		header,
 		": ",
-		infos[descriptionField].render,
+		infos[descField].render,
 	)
 
 	mainView := lipgloss.JoinVertical(
@@ -713,7 +622,7 @@ func (form mainForm) Result() (*commit.Message, error) {
 	msg := &commit.Message{
 		Type:        texts[typeField],
 		Scope:       texts[scopeField],
-		Description: texts[descriptionField],
+		Description: texts[descField],
 		Body:        texts[bodyField],
 		Footer:      texts[footerField],
 	}

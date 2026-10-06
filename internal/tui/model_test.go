@@ -36,7 +36,7 @@ func TestNewModel_WithExistingMessage(t *testing.T) {
 	m := newModel(cfg, existing)
 
 	typ := m.children.MustGet(typeField).(textModel)
-	desc := m.children.MustGet(descriptionField).(textModel)
+	desc := m.children.MustGet(descField).(textModel)
 	body := m.children.MustGet(bodyField).(textModel)
 
 	assert.Equal(t, "feat", typ.Value())

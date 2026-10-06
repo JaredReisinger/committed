@@ -20,7 +20,7 @@ tasks:
   logs:
     desc: watch .log.json log
     cmds:
-      - tail -f .log.json | cor --timestamp-format "%T" --timezone America/Phoenix --single-line --line-gap 0
+      - tail -n +1 -f .log.json | cor --timestamp-format "%T" --timezone America/Phoenix --single-line --line-gap 0
 
   example:
     desc: run example case (dummy test file)
