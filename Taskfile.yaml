@@ -85,6 +85,12 @@ tasks:
     cmds:
       - go vet ./...
 
+  vhs:
+    desc: create demo video
+    dir: docs
+    # eventually publish as well?
+    cmd: vhs teaser.tape
+
   tag-release:
     desc: tags the next release if warranted (and on CI)
     vars:
