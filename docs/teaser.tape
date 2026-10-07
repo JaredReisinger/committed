@@ -1,13 +1,14 @@
-Output teaser.webm
 Output teaser.gif
+Output teaser.mp4
+Output teaser.webm
 
 Require task
 #Set WindowBar Rings
-Set FontSize 18
+Set FontSize 12
 #Set FontFamily Consolas
-Set Columns 80
-Set Rows 30
-Set Padding 20
+Set Columns 60
+Set Rows 20
+Set Padding 10
 Set TypingSpeed 50ms
 
 # intro teaser...
@@ -16,18 +17,24 @@ Type "Tried using commitizen/git-cz?"
 Sleep 1s
 Type " Or the alternatives?"
 Sleep 2s
-Backspace@10ms 34
-Sleep 1s
+#Backspace@10ms 51
+#Sleep 1s
+Ctrl+A
+Ctrl+K
 Type "Find the line-by-line editing kind of"
 Type@750ms "..."
 Type " primitive?"
 Sleep 2s
-Backspace@10ms 51
-Sleep 1s
+#Backspace@10ms 51
+Ctrl+A
+Ctrl+K
+#Sleep 1s
 Type "Get committed!"
 Sleep 2s
 Hide
-Backspace@10ms 14
+#Backspace@10ms 14
+Ctrl+A
+Ctrl+K
 
 # build and fake git function
 Hide
@@ -47,10 +54,11 @@ Type "}"
 Enter
 Type "clear"
 Enter
+Sleep 10ms
 
 # actual demo
 Show
-Set TypingSpeed 100ms
+Set TypingSpeed 75ms
 Type "git commit"
 Enter
 Sleep 2
