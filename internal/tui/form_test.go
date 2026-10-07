@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/go-openapi/testify/v2/assert"
+
 	"github.com/jaredreisinger/committed/pkg/commit"
 	"github.com/jaredreisinger/committed/pkg/commitlint"
 	"github.com/jaredreisinger/committed/pkg/config"

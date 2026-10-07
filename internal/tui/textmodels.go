@@ -119,6 +119,16 @@ func (t textinputModel) SetMinWidth(w int) textinputModel {
 	return textinputModel{t.Model, w}
 }
 
+func (t textinputModel) KeyMap() textinput.KeyMap {
+	return t.Model.KeyMap
+}
+
+func (t textinputModel) SetKeyMap(keys textinput.KeyMap) textinputModel {
+	t2 := t.Model
+	t2.KeyMap = keys
+	return textinputModel{t2, t.minWidth}
+}
+
 // ===== textarea =============================================================
 
 // textareaModel shims and fixes [textarea.Model] to be a proper [tea.Model]
@@ -176,6 +186,16 @@ func (t textareaModel) View() tea.View {
 	return tea.NewView(view)
 }
 
+func (t textareaModel) KeyMap() textarea.KeyMap {
+	return t.Model.KeyMap
+}
+
+func (t textareaModel) SetKeyMap(keys textarea.KeyMap) textareaModel {
+	t2 := t.Model
+	t2.KeyMap = keys
+	return textareaModel{t2}
+}
+
 // ===== textModel ============================================================
 
 // textModel attempts to simplify the life of the consumer at the cost of a more
@@ -186,6 +206,7 @@ type textModel struct {
 	isArea bool
 	input  textinputModel
 	area   textareaModel
+	keymap textModelKeyMap
 }
 
 func newTextModel(isArea bool, placeholder string, initial string) textModel {
@@ -195,6 +216,7 @@ func newTextModel(isArea bool, placeholder string, initial string) textModel {
 		isArea: isArea,
 		input:  newTextInput(placeholder),
 		area:   newTextArea(placeholder),
+		keymap: DefaultTextModelKeyMap(),
 	}
 
 	if initial != "" {
@@ -238,7 +260,7 @@ func (t textModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		area = m.(textareaModel)
 	}
 
-	t2 := textModel{t.isArea, input, area}
+	t2 := textModel{t.isArea, input, area, t.keymap}
 
 	after := t2.Value()
 
@@ -261,7 +283,7 @@ func (t textModel) clone() textModel {
 	// slog.Debug("cloning textModel", "isArea", t.isArea)
 
 	// can we just return t by value?
-	return textModel{t.isArea, t.input, t.area}
+	return textModel{t.isArea, t.input, t.area, t.keymap}
 }
 
 // Other textinput/textarea APIs we need to shim...in the underlying models,
@@ -541,112 +563,246 @@ func (t textModel) Blur() (tea.Model, tea.Cmd) {
 	return t2, cmd
 }
 
+// Since we're merging textinput and textarea, we need a keymap that's the union
+// of those, and then pass the appropriate subset as needed.
+
+// textarea                      textinput
+// --------------------------------------------------------------------------
+// CapitalizeWordForward
+// CharacterBackward             CharacterBackward
+// CharacterForward              CharacterForward
+// CopySelection
+// DeleteAfterCursor             DeleteAfterCursor
+// DeleteBeforeCursor            DeleteBeforeCursor
+// DeleteCharacterBackward       DeleteCharacterBackward
+// DeleteCharacterForward        DeleteCharacterForward
+// DeleteWordBackward            DeleteWordBackward
+// DeleteWordForward             DeleteWordForward
+// InputBegin
+// InputEnd
+// InsertNewline
+// LineEnd                       LineEnd
+// LineNext
+// LinePrevious
+// LineStart                     LineStart
+// --                            NextSuggestion
+// LowercaseWordForward
+// PageDown
+// PageUp
+// Paste                         Paste
+// --                            PrevSuggestion
+// SelectAll
+// SelectCharacterBackward
+// SelectCharacterForward
+// SelectLineDown
+// SelectLineUp
+// SelectWordBackward
+// SelectWordForward
+// TransposeCharacterBackward
+// UppercaseWordForward
+// WordBackward                  WordBackward
+// WordForward                   WordForward
+// --------------------------------------------------------------------------
+
+// textModelKeyMap is the union of [textinput.KeyMap] and [textarea.KeyMap],
+// defined alphabetically (to make sure we don't' miss anything)
+type textModelKeyMap struct {
+	AcceptSuggestion           key.Binding // *textinput* only
+	CapitalizeWordForward      key.Binding // textarea only
+	CharacterBackward          key.Binding // both
+	CharacterForward           key.Binding // both
+	CopySelection              key.Binding // textarea only
+	DeleteAfterCursor          key.Binding // both
+	DeleteBeforeCursor         key.Binding // both
+	DeleteCharacterBackward    key.Binding // both
+	DeleteCharacterForward     key.Binding // both
+	DeleteWordBackward         key.Binding // both
+	DeleteWordForward          key.Binding // both
+	InputBegin                 key.Binding // textarea only
+	InputEnd                   key.Binding // textarea only
+	InsertNewline              key.Binding // textarea only
+	LineEnd                    key.Binding // both
+	LineNext                   key.Binding // textarea only
+	LinePrevious               key.Binding // textarea only
+	LineStart                  key.Binding // both
+	NextSuggestion             key.Binding // *textinput* only
+	LowercaseWordForward       key.Binding // textarea only
+	PageDown                   key.Binding // textarea only
+	PageUp                     key.Binding // textarea only
+	Paste                      key.Binding // both
+	PrevSuggestion             key.Binding // *textinput* only
+	SelectAll                  key.Binding // textarea only
+	SelectCharacterBackward    key.Binding // textarea only
+	SelectCharacterForward     key.Binding // textarea only
+	SelectLineDown             key.Binding // textarea only
+	SelectLineUp               key.Binding // textarea only
+	SelectWordBackward         key.Binding // textarea only
+	SelectWordForward          key.Binding // textarea only
+	TransposeCharacterBackward key.Binding // textarea only
+	UppercaseWordForward       key.Binding // textarea only
+	WordBackward               key.Binding // both
+	WordForward                key.Binding // both
+}
+
+// key.Binding conflates key bindings and help text, which I don't love. I might
+// come up with a "can act like key.Binding" replacement if I want to allow for
+// multiple key bindings (vim binding, emacs binding, pico/nano bindings...)
+func DefaultTextModelKeyMap() textModelKeyMap {
+	// *Should* we include keys in the map that aren't described? The concern is
+	// "magic" sequences that we might want for use later.
+	return textModelKeyMap{
+		// keys: ␤ ␈ ␡ ← ↑ → ↓ ↲ || NERDFONT:            
+		AcceptSuggestion:           key.NewBinding(key.WithDisabled()), // unbound would be better?
+		CapitalizeWordForward:      newBinding("alt+c", "capitalize word forward", "alt+c"),
+		CharacterBackward:          newBinding("←/ctrl+b", "char backward", "left", "ctrl+b"),
+		CharacterForward:           newBinding("→/ctrl+f", "char forward", "right", "ctrl+f"),
+		CopySelection:              newBinding("ctrl+shift+c", "copy selection", "ctrl+shift+c"),
+		DeleteAfterCursor:          newBinding("ctrl+k", "delete after cursor", "ctrl+k"),
+		DeleteBeforeCursor:         newBinding("ctrl+u", "delete before cursor", "ctrl+u"),
+		DeleteCharacterBackward:    newBinding("backspace", "delete char backward", "backspace", "ctrl+h"),
+		DeleteCharacterForward:     newBinding("delete", "delete char forward", "delete", "ctrl+u"),
+		DeleteWordBackward:         newBinding("alt+backspace", "delete word backward", "alt+backspace", "ctrl+w"),
+		DeleteWordForward:          newBinding("alt+delete", "delete word forward", "alt+delete", "alt+d", "ctrl+delete"),
+		InputBegin:                 newBinding("alt+<", "beginning of text", "alt+<", "ctrl+home"),
+		InputEnd:                   newBinding("alt+>", "end of text", "alt+>", "ctrl+end"),
+		InsertNewline:              newBinding("↲/enter", "insert newline", "enter", "ctrl+m"),
+		LineEnd:                    newBinding("end/ctrl+e", "line end", "end", "ctrl+e"),
+		LineNext:                   newBinding("↓/down", "next line", "down", "ctrl+n"),
+		LinePrevious:               newBinding("↑/up", "previous line", "up", "ctrl+p"),
+		LineStart:                  newBinding("home/ctrl+a", "line start", "home", "ctrl+a"),
+		NextSuggestion:             key.NewBinding(key.WithDisabled()), // unbound would be better?
+		LowercaseWordForward:       newBinding("alt+l", "lowercase word forward", "alt+l"),
+		PageDown:                   newBinding("pgdown", "page down", "pgdown"),
+		PageUp:                     newBinding("pgup", "page up", "pgup"),
+		Paste:                      newBinding("ctrl+v", "paste", "ctrl+v"),
+		PrevSuggestion:             key.NewBinding(key.WithDisabled()), // unbound would be better?
+		SelectAll:                  newBinding("", "", ""),
+		SelectCharacterBackward:    newBinding("shift+←", "select character backward", "shift+left"),
+		SelectCharacterForward:     newBinding("shift+→", "select character forward", "shift+right"),
+		SelectLineDown:             newBinding("shift+↓", "select line down", "shift+down"),
+		SelectLineUp:               newBinding("shift+↑", "select line up", "shift+up"),
+		SelectWordBackward:         newBinding("ctrl+shift+←", "select word backward", "ctrl+shift+left", "alt+shift+left", "alt+shift+b"),
+		SelectWordForward:          newBinding("ctrl+shift+→", "select word forward", "ctrl+shift+right", "alt+shift+right", "alt+shift+f"),
+		TransposeCharacterBackward: newBinding("ctrl+t", "transpose character backward", "ctrl+t"),
+		UppercaseWordForward:       newBinding("alt+u", "uppercase word forward", "alt+u"),
+		WordBackward:               newBinding("ctrl+←", "previous word", "ctrl+left", "alt+left", "alt+b"),
+		WordForward:                newBinding("ctrl+→", "next word", "ctrl+right", "alt+right", "alt+f"),
+	}
+}
+
+// a more-compact keys.NewBinding...
+func newBinding(display string, help string, keys ...string) key.Binding {
+	return key.NewBinding(key.WithKeys(keys...), key.WithHelp(display, help))
+}
+
+func (keys textModelKeyMap) ForTextInput() textinput.KeyMap {
+	return textinput.KeyMap{
+		CharacterForward:        keys.CharacterForward,
+		CharacterBackward:       keys.CharacterBackward,
+		WordForward:             keys.WordForward,
+		WordBackward:            keys.WordBackward,
+		DeleteWordBackward:      keys.DeleteWordBackward,
+		DeleteWordForward:       keys.DeleteWordForward,
+		DeleteAfterCursor:       keys.DeleteAfterCursor,
+		DeleteBeforeCursor:      keys.DeleteBeforeCursor,
+		DeleteCharacterBackward: keys.DeleteCharacterBackward,
+		DeleteCharacterForward:  keys.DeleteCharacterForward,
+		LineStart:               keys.LineStart,
+		LineEnd:                 keys.LineEnd,
+		Paste:                   keys.Paste,
+		AcceptSuggestion:        keys.AcceptSuggestion,
+		NextSuggestion:          keys.NextSuggestion,
+		PrevSuggestion:          keys.PrevSuggestion,
+	}
+}
+
+func (keys textModelKeyMap) ForTextArea() textarea.KeyMap {
+	return textarea.KeyMap{
+		CharacterBackward:          keys.CharacterBackward,
+		CharacterForward:           keys.CharacterForward,
+		DeleteAfterCursor:          keys.DeleteAfterCursor,
+		DeleteBeforeCursor:         keys.DeleteBeforeCursor,
+		DeleteCharacterBackward:    keys.DeleteCharacterBackward,
+		DeleteCharacterForward:     keys.DeleteCharacterForward,
+		DeleteWordBackward:         keys.DeleteWordBackward,
+		DeleteWordForward:          keys.DeleteWordForward,
+		InsertNewline:              keys.InsertNewline,
+		LineEnd:                    keys.LineEnd,
+		LineNext:                   keys.LineNext,
+		LinePrevious:               keys.LinePrevious,
+		LineStart:                  keys.LineStart,
+		PageUp:                     keys.PageUp,
+		PageDown:                   keys.PageDown,
+		Paste:                      keys.Paste,
+		WordBackward:               keys.WordBackward,
+		WordForward:                keys.WordForward,
+		InputBegin:                 keys.InputBegin,
+		InputEnd:                   keys.InputEnd,
+		UppercaseWordForward:       keys.UppercaseWordForward,
+		LowercaseWordForward:       keys.LowercaseWordForward,
+		CapitalizeWordForward:      keys.CapitalizeWordForward,
+		TransposeCharacterBackward: keys.TransposeCharacterBackward,
+		SelectCharacterForward:     keys.SelectCharacterForward,
+		SelectCharacterBackward:    keys.SelectCharacterBackward,
+		SelectWordForward:          keys.SelectWordForward,
+		SelectWordBackward:         keys.SelectWordBackward,
+		SelectLineUp:               keys.SelectLineUp,
+		SelectLineDown:             keys.SelectLineDown,
+		SelectAll:                  keys.SelectAll,
+		CopySelection:              keys.CopySelection,
+	}
+}
+
+func (t textModel) KeyMap() textModelKeyMap {
+	return t.keymap
+}
+
+func (t textModel) SetKeyMap(keys textModelKeyMap) textModel {
+	input2 := t.input.SetKeyMap(keys.ForTextInput())
+	area2 := t.area.SetKeyMap(keys.ForTextArea())
+	return textModel{t.isArea, input2, area2, keys}
+}
+
 // We don't really care about the full map as much as we care about the
-// key.Bindings for help, and we return it in the order we care about
+// key.Bindings for help, and we return it in the order we care about.  We also
+// don't plumb this through to textinputModel and textareaModel, because then we
+// have more places to update if we change the order.
 func (t textModel) GetKeyBindings() []key.Binding {
+	var bindings []key.Binding
+	commonBindings := []key.Binding{
+		// t.keymap.CharacterBackward,
+		// t.keymap.CharacterForward,
+		t.keymap.DeleteAfterCursor,
+		t.keymap.DeleteBeforeCursor,
+		// t.keymap.DeleteCharacterBackward,
+		// t.keymap.DeleteCharacterForward,
+		t.keymap.DeleteWordBackward,
+		t.keymap.DeleteWordForward,
+		t.keymap.Paste,
+		t.keymap.WordBackward,
+		t.keymap.WordForward,
+	}
+
 	if !t.isArea {
-		// textinput has no help! 🤦🏼‍♂️
-		km := t.input.KeyMap
-		bindings := []key.Binding{
-			// km.CharacterBackward,
-			// km.CharacterForward,
-			km.DeleteAfterCursor,
-			km.DeleteBeforeCursor,
-			// km.DeleteCharacterBackward,
-			// km.DeleteCharacterForward,
-			km.DeleteWordBackward,
-			km.DeleteWordForward,
-			// km.LineEnd,
-			// km.LineStart,
-			km.Paste,
-			km.WordBackward,
-			km.WordForward,
-			// km.AcceptSuggestion
-			// km.NextSuggestion
-			// km.PrevSuggestion
+		bindings = commonBindings
+	} else {
+		bindings = []key.Binding{
+			t.keymap.InsertNewline,
 		}
-
-		if bindings[0].Help().Desc == "" {
-			// get the help from text area, hoping the keys are similar
-			areaKeyMap := textarea.DefaultKeyMap()
-			keyHelp := make(map[string]string, 24)
-			for _, takb := range []key.Binding{
-				areaKeyMap.CharacterBackward,
-				areaKeyMap.CharacterForward,
-				areaKeyMap.DeleteAfterCursor,
-				areaKeyMap.DeleteBeforeCursor,
-				areaKeyMap.DeleteCharacterBackward,
-				areaKeyMap.DeleteCharacterForward,
-				areaKeyMap.DeleteWordBackward,
-				areaKeyMap.DeleteWordForward,
-				areaKeyMap.InsertNewline,
-				areaKeyMap.LineEnd,
-				areaKeyMap.LineNext,
-				areaKeyMap.LinePrevious,
-				areaKeyMap.LineStart,
-				areaKeyMap.PageUp,
-				areaKeyMap.PageDown,
-				areaKeyMap.Paste,
-				areaKeyMap.WordBackward,
-				areaKeyMap.WordForward,
-				areaKeyMap.InputBegin,
-				areaKeyMap.InputEnd,
-				areaKeyMap.UppercaseWordForward,
-				areaKeyMap.LowercaseWordForward,
-				areaKeyMap.CapitalizeWordForward,
-				areaKeyMap.TransposeCharacterBackward,
-			} {
-				help := takb.Help().Desc
-				for _, key := range takb.Keys() {
-					keyHelp[key] = help
-				}
-			}
-
-			// now that we have the help text from textarea, apply it to any
-			// matching keys for textinput
-			newBindings := make([]key.Binding, 0, len(bindings))
-			for _, b := range bindings {
-				keyStr := b.Keys()[0]
-				newBindings = append(newBindings,
-					key.NewBinding(
-						key.WithKeys(b.Keys()...),
-						key.WithHelp(keyStr, keyHelp[keyStr]),
-						// key.WithDisabled(),
-					))
-			}
-			bindings = newBindings
-		}
-
-		return bindings
+		bindings = append(bindings, commonBindings...)
+		bindings = append(bindings, []key.Binding{
+			t.keymap.InputBegin,
+			t.keymap.InputEnd,
+			t.keymap.UppercaseWordForward,
+			t.keymap.LowercaseWordForward,
+			t.keymap.CapitalizeWordForward,
+			t.keymap.TransposeCharacterBackward,
+		}...)
 	}
 
-	km := t.area.KeyMap
-	return []key.Binding{
-		km.InsertNewline,
-		// km.CharacterBackward,
-		// km.CharacterForward,
-		km.DeleteAfterCursor,
-		km.DeleteBeforeCursor,
-		// km.DeleteCharacterBackward,
-		// km.DeleteCharacterForward,
-		km.DeleteWordBackward,
-		km.DeleteWordForward,
-		// km.LineEnd,
-		// km.LineNext,
-		// km.LinePrevious,
-		// km.LineStart,
-		// km.PageUp,
-		// km.PageDown,
-		km.Paste,
-		km.WordBackward,
-		km.WordForward,
-		km.InputBegin,
-		km.InputEnd,
-		km.UppercaseWordForward,
-		km.LowercaseWordForward,
-		km.CapitalizeWordForward,
-		km.TransposeCharacterBackward,
-	}
+	// we used to have a helper that set up key help, copying from
+	// textarea.KeyMap's binding.Help
+	return bindings
 }
 
 // unified style support

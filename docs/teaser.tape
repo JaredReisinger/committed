@@ -65,7 +65,9 @@ Sleep 2
 Down@300ms 6
 Sleep 0.5
 Up@200ms 2
-Tab 2
+Tab
+Sleep 1
+Tab
 Type "testing committed"
 Tab
 Type "You just type your message here."
@@ -78,12 +80,13 @@ Type "... oops!"
 Sleep 1
 Type " It's a *full* editor, so you can go back and fix it!"
 Sleep 1
-Up
+Up 2
+Ctrl+e
+Left
 Backspace 3
 Type "ake"
 Sleep 2
-#Ctrl+Enter
-Ctrl+c
-#Wait
-Sleep 2
-Type "It's that easy! (Ctrl+Enter in vhs isn't working for me 🤷)"
+Ctrl+x
+Sleep 1
+Type "It's that easy!
+Sleep 5

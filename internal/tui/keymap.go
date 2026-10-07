@@ -8,14 +8,15 @@ import (
 )
 
 type keyMap struct {
-	Cancel     key.Binding
-	NextSingle key.Binding
-	NextMulti  key.Binding
-	Prev       key.Binding
-	Submit     key.Binding
+	Cancel         key.Binding
+	NextFromSingle key.Binding
+	NextFromMulti  key.Binding
+	Prev           key.Binding
+	Submit         key.Binding
 }
 
 var defaultKeyMap = keyMap{
+	// keys: ␤ ␈ ␡ ← ↑ → ↓ ↲ || NERDFONT:            
 	Cancel: key.NewBinding(
 		// key.WithKeys("ctrl+c", "esc"),
 		// key.WithHelp("ctrl+c/esc", "cancel"),
@@ -23,12 +24,12 @@ var defaultKeyMap = keyMap{
 		key.WithHelp("ctrl+c", "cancel"),
 	),
 
-	NextSingle: key.NewBinding(
+	NextFromSingle: key.NewBinding(
 		key.WithKeys("tab", "enter"),
 		key.WithHelp("tab/enter", "next field"),
 	),
 
-	NextMulti: key.NewBinding(
+	NextFromMulti: key.NewBinding(
 		key.WithKeys("tab"),
 		key.WithHelp("tab", "next field"),
 		key.WithDisabled(),
@@ -40,19 +41,15 @@ var defaultKeyMap = keyMap{
 	),
 
 	Submit: key.NewBinding(
-		key.WithKeys("ctrl+enter"),
-		key.WithHelp("ctrl+enter", "submit message"),
+		key.WithKeys("ctrl+x", "ctrl+s", "ctrl+enter"),
+		key.WithHelp("ctrl+x", "submit message"),
 	),
 }
 
-// func (k *keyMap) forHelp() help.KeyMap {
-
-// }
-
 func (k *keyMap) ShortHelp() []key.Binding {
 	return []key.Binding{
-		k.NextSingle,
-		k.NextMulti,
+		k.NextFromSingle,
+		k.NextFromMulti,
 		k.Prev,
 		k.Cancel,
 		k.Submit,
@@ -63,12 +60,12 @@ func (k *keyMap) FullHelp() [][]key.Binding {
 	return nil
 }
 
-func buildHelpKeys(textKeyBindings []key.Binding) help.KeyMap {
+func buildHelpKeys(fieldKeyBindings []key.Binding) help.KeyMap {
 	// combine maps
 	h := &helpMap{}
 
 	h.short = defaultKeyMap.ShortHelp()
-	h.short = append(h.short, textKeyBindings...)
+	h.short = append(h.short, fieldKeyBindings...)
 
 	// For the long list, it's 6 or 7 per group, and we can tell based on the
 	// full length...(4+7) or (4+14), 11 or 18, so we pick 15 as the threshold

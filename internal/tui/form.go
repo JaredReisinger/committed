@@ -209,8 +209,8 @@ func (form mainForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msgT, defaultKeyMap.Cancel):
 			cmds = append(cmds, tea.Interrupt)
 
-		case key.Matches(msgT, defaultKeyMap.NextSingle) ||
-			key.Matches(msgT, defaultKeyMap.NextMulti):
+		case key.Matches(msgT, defaultKeyMap.NextFromSingle) ||
+			key.Matches(msgT, defaultKeyMap.NextFromMulti):
 			cmds = append(cmds, form.nextField())
 
 		case key.Matches(msgT, defaultKeyMap.Prev):
@@ -420,11 +420,11 @@ func (form mainForm) setFocus(focusField field) (mainForm, tea.Cmd) {
 	// way...
 	if form.focusedField != typeList {
 		if form.children.MustGet(form.focusedField).(textModel).isArea {
-			defaultKeyMap.NextSingle.SetEnabled(false)
-			defaultKeyMap.NextMulti.SetEnabled(true)
+			defaultKeyMap.NextFromSingle.SetEnabled(false)
+			defaultKeyMap.NextFromMulti.SetEnabled(true)
 		} else {
-			defaultKeyMap.NextSingle.SetEnabled(true)
-			defaultKeyMap.NextMulti.SetEnabled(false)
+			defaultKeyMap.NextFromSingle.SetEnabled(true)
+			defaultKeyMap.NextFromMulti.SetEnabled(false)
 		}
 	}
 
