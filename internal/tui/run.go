@@ -12,7 +12,7 @@ import (
 var testHookProgram *tea.Program
 
 func Run(cfg *config.Config, existingMsg *commit.Message) (*commit.Message, error) {
-	m := newModel(cfg, existingMsg)
+	m := newForm(cfg, existingMsg)
 
 	p := tea.NewProgram(m)
 	testHookProgram = p

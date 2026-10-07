@@ -2,6 +2,7 @@ package tui
 
 import (
 	"log/slog"
+	"slices"
 	"strings"
 
 	"charm.land/bubbles/v2/help"
@@ -36,24 +37,27 @@ const (
 // absolute mess, with no sense of immutability at all.  The addition of
 // [teautil.Router] is helping a ton, however.
 type mainForm struct {
-	config        *config.Config
-	existingMsg   *commit.Message // just for init, don't persist
-	focusedField  field
-	children      teautil.Router[field, tea.Model] // *focusable* children
-	fieldErrs     map[field]error                  // field validation errors
-	winWidth      int
-	winHeight     int
-	bodyMaxHeight int
-	help          help.Model
+	config      *config.Config
+	existingMsg *commit.Message // just for init, don't persist
+
+	children  teautil.Router[field, tea.Model] // *focusable* children
+	fieldErrs map[field]error                  // field validation errors
+
+	tabstops     []field // see focus handlers and newForm
+	focusedField field
+
+	winWidth  int
+	winHeight int
+	help      help.Model // move to children?
 
 	limits FieldVals[Limits]
 
 	err error // should this be validation error(s) as well?
 }
 
-// newModel creates a new TUI model with the given configuration and optional
+// newForm creates a new TUI model with the given configuration and optional
 // existing message.
-func newModel(cfg *config.Config, existingMsg *commit.Message) mainForm {
+func newForm(cfg *config.Config, existingMsg *commit.Message) mainForm {
 	// get existing message content...
 	var initialType string
 	var initialScope string
@@ -96,10 +100,24 @@ func newModel(cfg *config.Config, existingMsg *commit.Message) mainForm {
 		initialType = list.SelectedItem()
 	}
 
+	// We want the user to be able to opt out of the type list, or ever setting
+	// focus in the type field and *only* using the type list, so we keep a list
+	// of tabstops that's distinct from the children.  We *could* keep a
+	// separate tabIndex, and/or use tabstops[tabIndex] instead of
+	// focusedField... but the list of tabstops is small enough that a linear
+	// search is good enough.
+	tabstops := []field{
+		// by default, we don't edit the type field directly
+		typeList,
+		scopeField,
+		descField,
+		bodyField,
+		footerField,
+	}
+
 	form := mainForm{
-		config:       cfg,
-		existingMsg:  existingMsg,
-		focusedField: typeList,
+		config:      cfg,
+		existingMsg: existingMsg,
 
 		// There's an interesting question about whether the form's fields
 		// should be *all* models or just focusable ones.  Perhaps `children`
@@ -119,6 +137,9 @@ func newModel(cfg *config.Config, existingMsg *commit.Message) mainForm {
 		}),
 
 		fieldErrs: make(map[field]error, maxField),
+
+		tabstops:     tabstops,
+		focusedField: tabstops[0],
 
 		help:   help,
 		limits: limits,
@@ -427,29 +448,43 @@ func (form mainForm) setFocus(focusField field) (mainForm, tea.Cmd) {
 	form.children = form.children.SetMap(modelMap)
 	form.focusedField = focusField
 
-	// NOTE: defaultKeyMap is a global, which isn't really the Elm Architecture
-	// way...
-	if form.focusedField != typeList {
-		if form.children.MustGet(form.focusedField).(textModel).isArea {
-			defaultKeyMap.NextFromSingle.SetEnabled(false)
-			defaultKeyMap.NextFromMulti.SetEnabled(true)
-		} else {
-			defaultKeyMap.NextFromSingle.SetEnabled(true)
-			defaultKeyMap.NextFromMulti.SetEnabled(false)
-		}
-	}
+	// // NOTE: defaultKeyMap is a global, which isn't really the Elm Architecture
+	// // way...
+	// if form.focusedField != typeList {
+	// 	if form.children.MustGet(form.focusedField).(textModel).isArea {
+	// 		defaultKeyMap.NextFromSingle.SetEnabled(false)
+	// 		defaultKeyMap.NextFromMulti.SetEnabled(true)
+	// 	} else {
+	// 		defaultKeyMap.NextFromSingle.SetEnabled(true)
+	// 		defaultKeyMap.NextFromMulti.SetEnabled(false)
+	// 	}
+	// }
 
 	return form, tea.Batch(cmds...)
 }
 
+// Looks up v in s, then calculates the index delta, wrapping around if needed.
+func circularDelta[S ~[]E, E comparable](s S, v E, delta int) E {
+	curIndex := slices.Index(s, v)
+	if curIndex < 0 {
+		return s[0]
+	}
+	// we *could* loop to ensure the new index is in [0, len), but we can play
+	// with some math to make it easier. "delta % len" ensures a value in the
+	// range (-len, len), adding another len ensures it's not negative.
+	l := len(s)
+	newIndex := (curIndex + (delta % l) + l) % l
+	return s[newIndex]
+}
+
 // nextField moves to the next field.
 func (form mainForm) nextField() tea.Cmd {
-	return setFocusCmd(max((form.focusedField+1)%maxField, typeList))
+	return setFocusCmd(circularDelta(form.tabstops, form.focusedField, 1))
 }
 
 // prevField moves to the previous field.
 func (form mainForm) prevField() tea.Cmd {
-	return setFocusCmd((form.focusedField + maxField - 1) % maxField)
+	return setFocusCmd(circularDelta(form.tabstops, form.focusedField, -1))
 }
 
 type KeyBinder interface {
