@@ -43,8 +43,29 @@ func listSelectionChangedCmd(index int, item string) tea.Cmd {
 	}
 }
 
-func (l listModel) getSelectedIndex() int {
+func (l listModel) SelectedIndex() int {
 	return l.selectedIndex
+}
+
+func (l listModel) SetSelectedIndex(index int) listModel {
+	l2 := l
+	l2.selectedIndex = max(0, min(len(l2.items), index))
+	return l2
+}
+
+func (l listModel) SelectedItem() string {
+	return l.items[l.selectedIndex]
+}
+
+func (l listModel) SetSelectedItem(item string) (listModel, bool) {
+	index := slices.Index(l.items, item)
+	if index < 0 {
+		return l, false
+	}
+
+	l2 := l
+	l2.selectedIndex = index
+	return l2, true
 }
 
 func (l listModel) Init() tea.Cmd { return nil }
@@ -99,17 +120,17 @@ func (l listModel) GetKeyBindings() []key.Binding {
 	bindings := []key.Binding{
 		km.Up,
 		km.Down,
-		km.SelectAndNext,
-		km.SelectAndPrev,
+		// km.SelectAndNext,
+		// km.SelectAndPrev,
 	}
 	return bindings
 }
 
 type listKeyMapX struct {
-	Up            key.Binding
-	Down          key.Binding
-	SelectAndNext key.Binding
-	SelectAndPrev key.Binding
+	Up   key.Binding
+	Down key.Binding
+	// SelectAndNext key.Binding
+	// SelectAndPrev key.Binding
 }
 
 var listKeyMap = listKeyMapX{
@@ -123,13 +144,13 @@ var listKeyMap = listKeyMapX{
 		key.WithHelp("↓", "down"),
 	),
 
-	SelectAndNext: key.NewBinding(
-		key.WithKeys("tab"),
-		key.WithHelp("tab", "select/next"),
-	),
+	// SelectAndNext: key.NewBinding(
+	// 	key.WithKeys("tab"),
+	// 	key.WithHelp("tab", "select/next"),
+	// ),
 
-	SelectAndPrev: key.NewBinding(
-		key.WithKeys("shift+tab"),
-		key.WithHelp("shift+tab", "select/prev"),
-	),
+	// SelectAndPrev: key.NewBinding(
+	// 	key.WithKeys("shift+tab"),
+	// 	key.WithHelp("shift+tab", "select/prev"),
+	// ),
 }

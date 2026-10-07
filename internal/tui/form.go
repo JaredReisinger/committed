@@ -85,6 +85,17 @@ func newModel(cfg *config.Config, existingMsg *commit.Message) mainForm {
 		footerHeight: Limits{1, 0}, // ?? really?
 	}
 
+	list := newListModel(cfg.Rules.TypeEnum.Value)
+	if initialType != "" {
+		var ok bool
+		list, ok = list.SetSelectedItem(initialType)
+		if !ok {
+			slog.Warn("incoming type is not valid")
+		}
+	} else {
+		initialType = list.SelectedItem()
+	}
+
 	form := mainForm{
 		config:       cfg,
 		existingMsg:  existingMsg,
@@ -100,7 +111,7 @@ func newModel(cfg *config.Config, existingMsg *commit.Message) mainForm {
 
 		children: teautil.NewRouter(map[field]tea.Model{
 			typeField:   newTextModel(false, "type", initialType).SetCharLimit(limits.typeWidth.max),
-			typeList:    newListModel(cfg.Rules.TypeEnum.Value),
+			typeList:    list,
 			scopeField:  newTextModel(false, "scope", initialScope).SetCharLimit(limits.scopeWidth.max),
 			descField:   newTextModel(false, "description", initialDesc).SetCharLimit(limits.descWidth.max),
 			bodyField:   newTextModel(true, "message body", initialBody).SetMaxContentHeight(100).SetDynamicHeight(true),
