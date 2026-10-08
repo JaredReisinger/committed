@@ -132,8 +132,8 @@ func newForm(cfg *config.Config, existingMsg *commit.Message) mainForm {
 			typeList:    list,
 			scopeField:  newTextModel(false, "scope", initialScope).SetCharLimit(limits.scopeWidth.max),
 			descField:   newTextModel(false, "description", initialDesc).SetCharLimit(limits.descWidth.max),
-			bodyField:   newTextModel(true, "message body", initialBody).SetMaxContentHeight(100).SetDynamicHeight(true),
-			footerField: newTextModel(true, "footer", initialFooter).SetMaxContentHeight(50),
+			bodyField:   newTextModel(true, "message body", initialBody).SetMaxContentHeight(100).SetDynamicHeight(true).SetMinHeight(4),
+			footerField: newTextModel(true, "footer", initialFooter).SetMaxContentHeight(50).SetMinHeight(1),
 		}),
 
 		fieldErrs: make(map[field]error, maxField),
@@ -161,7 +161,7 @@ func (form mainForm) Init() tea.Cmd {
 	// should other processing happen here?
 	// return textinput.Blink
 	// Set initial focus
-	return setFocusCmd(typeList)
+	return nil //setFocusCmd(typeList)
 }
 
 type setFocusMsg struct {
@@ -177,7 +177,7 @@ func setFocusCmd(f field) tea.Cmd {
 // Update handles user input and updates the model.
 func (form mainForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd // aggregated commands
-	var cmd tea.Cmd    // returned Cmd from delgated Update() calls
+	var cmd tea.Cmd    // returned Cmd from delegated Update() calls
 	handled := false
 
 	switch msgT := msg.(type) {
@@ -447,18 +447,6 @@ func (form mainForm) setFocus(focusField field) (mainForm, tea.Cmd) {
 	}
 	form.children = form.children.SetMap(modelMap)
 	form.focusedField = focusField
-
-	// // NOTE: defaultKeyMap is a global, which isn't really the Elm Architecture
-	// // way...
-	// if form.focusedField != typeList {
-	// 	if form.children.MustGet(form.focusedField).(textModel).isArea {
-	// 		defaultKeyMap.NextFromSingle.SetEnabled(false)
-	// 		defaultKeyMap.NextFromMulti.SetEnabled(true)
-	// 	} else {
-	// 		defaultKeyMap.NextFromSingle.SetEnabled(true)
-	// 		defaultKeyMap.NextFromMulti.SetEnabled(false)
-	// 	}
-	// }
 
 	return form, tea.Batch(cmds...)
 }
