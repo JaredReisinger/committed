@@ -7,8 +7,20 @@ import (
 	"os"
 )
 
-// ExtractArgs parses command line arguments from commit-msg or prepare-commit-msg hook.
-// The hook receives: <commit-msg-file> [<source>] [<SHA1>]
+// ExtractArgs parses command line arguments, handling core.editor or the
+// prepare-commit-msg or commit-msg hook patterns:
+//
+// core.editor:        <msg-file>
+// prepare-commit-msg: <msg-file> <source> <sha1>
+// commit-msg:         <msg-file>
+//
+// The <msg-file> is typically one of:
+//
+//	.git/COMMIT_EDITMSG   (commits, amends, cherry-pick, and rebase reword)
+//	.git/MERGE_MSG        (merge)
+//	.git/SQUASH_MSG       (squash)
+//	.git/TAG_EDITMSG      (tag)
+//	.git/git-rebase-todo  (rebase picker, should warn)
 func ExtractArgs(args []string, dryRun bool) (file string, source string, ref string, err error) {
 	c := len(args)
 

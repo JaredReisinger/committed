@@ -37,6 +37,8 @@ func Run(args []string, dryRun bool, logFile string) error {
 		return errors.WithMessage(err, "error parsing hook arguments")
 	}
 
+	slog.Info("invoked with file", "file", file)
+
 	cfg, err := config.LoadConfig(".")
 	if err != nil {
 		return errors.WithMessage(err, "error loading config")
