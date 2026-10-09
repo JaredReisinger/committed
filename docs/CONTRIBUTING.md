@@ -34,9 +34,13 @@ If you've run across what feels like a bug, first [check to see if there's alrea
 When describing the bug, please be as detailed as possible:
 
 - **Use a clear and descriptive title** to help identify the problem.
+
 - **Include the version number of committed** that you're using.
+
 - **Provide a description or excerpt of the code** if you can.
+
 - **Include the error message** if there was one.
+
 - **Include a screenshot or animated GIF** if it's a rendering issue.
 
 ### Suggesting enhancements
@@ -46,13 +50,25 @@ Much as with bugs, please first [check to see if there's already an open issue](
 When suggesting a new enhancement, please be as detailed as possible:
 
 - **Use a clear and descriptive title** to help identify the suggestion.
+
 - **Provide a description of the problem you're trying to solve** rather than simply suggesting the solution outright. In some cases, there might be a different approach altogether that actually fulfills your needs more directly.
+
 - **Explain why this problem might be of general interest** and not an isolated one-off solution to your specific problem. (If you feel it's more of a one-off situation, you should still feel free to open an issue so we can discuss possible solutions!)
+
 - **Include the version number of committed** that you're using.
 
 ### Pull requests / development
 
-Once you’ve done a `go mod download` to retrieve all of the dependencies, you’ll also have all of the additional tooling you need to build and test. This project leverages [`task`](https://taskfile.dev), installed as a Go tool, to manage testing and building:
+This project leverages [`task`](https://taskfile.dev), installed as a Go tool, to manage testing and building. If you _already_ have `task` installed, use `task prepare` to download all of the needed dependencies and tools, and to set `committed` up as this repo’s commit message editor.
+
+If you _don’t_ have `task` yet, you’ll need to bootstrap yourself. Run:
+
+```bash
+go mod download
+go tool task prepare   # this step can take a bit since task needs to build
+```
+
+From this point on `go tool task` will list the available task targets/recipes, such as:
 
 ```bash
 # Run tests
@@ -60,14 +76,7 @@ go tool task test
 
 # Build
 go tool task build
-
-# Install locally
-go tool task install
 ```
-
-> [!NOTE]
->
-> If you already have `task` installed, you can shorten these from `go tool task ...` to just `task ...`.
 
 Please make sure your commit messages follow the [Conventional Commits](https://www.conventionalcommits.org) standard, and use your PR to describe the specific problem you are trying to solve, or the feature you are adding and why it’s a benefit.
 

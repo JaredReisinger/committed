@@ -4,7 +4,8 @@
 //
 // Unlike many other commit-helper tools, committed does not expect to be
 // invoked directly on the command-line; it expects to be invoked as a Git
-// [commit-msg] hook. This means that committed does not create the commit in
+// editor either set in the config as 'core.editor', or via the GIT_EDITOR
+// environment variable. This means that committed does not create the commit in
 // and of itself, it is only concerned with editing the commit message.
 //
 // Committed attempts to discover any conventional-commit configurations in use
@@ -15,7 +16,6 @@
 //
 // [commitizen]: https://commitizen-tools.github.io/commitizen/
 // [git-cz]: https://github.com/streamich/git-cz
-// [commit-msg]: https://git-scm.com/book/en/v2/Customizing-Git-Git-Hooks
 package main
 
 import (

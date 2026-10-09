@@ -9,8 +9,10 @@ tasks:
   prepare:
     desc: one-time post-clone repo setup
     cmds:
-      - go mod tidy
-      - 'echo "NYI: bootstrapping committed as the commit-msg hook?"'
+      - go mod download
+      - echo "setting up committed as this repo's commit editor..."
+      - git config set --local core.editor "go tool task run --"
+      - echo "use 'git config unset --local core.editor' to undo"
 
   run:
     desc: run from code
