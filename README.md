@@ -9,85 +9,71 @@ grade](https://img.shields.io/codacy/grade/f9e05f25d82e4c5d8b5421b54b49af38?logo
 [![code coverage](https://img.shields.io/codecov/c/github/JaredReisinger/committed?logo=codecov&logoColor=white)](https://app.codecov.io/gh/JaredReisinger/committed)
 ![GitHub License](https://img.shields.io/github/license/JaredReisinger/committed)
 
-A bubbletea-powered text UI that integrates as a proper `commit-msg` hook for conventional commits.
+A bubbletea-powered text UI that functions as a smart, conventional-commit-aware editor for Git
 
 ![screenshot](./docs/screenshot.png)
 
-## Installation
+## Features
 
-Either grab the binary appropriate to your platform from the [Releases](https://github.com/JaredReisinger/committed/releases) page, or install directly from Go:
-
-```bash
-go install github.com/jaredreisinger/committed@latest
-```
-
-> [!NOTE]
->
-> If you're using Go 1.24 or later, you can also add `committed` as a tool dependency via:
->
-> ```bash
-> go get -tool github.com/jaredreisinger/committed@latest
-> ```
+- Interactive TUI for composing conventional commits
+- Automatic detection and enforcement of project conventions
+- Proper handling when re-using an existing commit message
+- Real-time validation with helpful error messages
 
 
-## Usage
+## Getting started
 
-### As a Git Hook
+How you install `committed` depends on how you intend to use it.
 
-Install as a `commit-msg` hook:
+- _Are you someone who commits across several repos, of any programming language, and you want something to make it easier to edit conventional commit messages?_ See the [**Global installation**](#global-installation) instructions.
 
-```bash
-# In your git repository
-ln -s $(which committed) .git/hooks/commit-msg
-```
+- _Are you a Go developer, and you want easy access to `committed` in your projects for you and for any contributors?_ See the [**Project installation**](#project-installation) instructions.
 
-or create a `.git/hooks/commit-msg` file that leverages it:
+### Global installation
 
-```bash
-cat <<EOF > .git/hooks/commit-msg
-#!/usr/bin/sh
-committed $@
-EOF
+1. Find the binary appropriate to your platform [Releases](https://github.com/JaredReisinger/committed/releases) page, or install using Go:
 
-chmod +x .git/hooks/commit-msg
-```
+   ```bash
+   go install github.com/jaredreisinger/committed@latest
+   ```
 
-> [!NOTE]
->
-> If you're using Go 1.24 or later, and added `committed` as a tool dependency, you can start it with `go tool committed`:
->
-> ```bash
-> cat <<EOF > .git/hooks/commit-msg
-> #!/usr/bin/sh
-> go tool committed $@
-> EOF
->
-> chmod +x .git/hooks/commit-msg
-> ```
+   > [!NOTE]
+   >
+   > No self-installing bash/powershell script yet, but I’m looking at what tools like Homebrew do, and might put something together to make the non-`go install` case a one-liner.
 
+2. Configure Git to use `committed` as your `core.editor` either globally or on a repo-by-repo basis:
 
-Now when you run `git commit`, the TUI will appear to help format your commit message.
+   ```bash
+   # use committed in all repos by default
+   git config set --global core.editor committed
 
-### Manual Usage
+   # use committed in only the current repo
+   git config set --local core.editor committed
+   ```
 
-You can also run the tool manually; it will load/edit the given file:
+When you `git commit`, Git will now invoke `committed` to edit your commit messages.
+
+### Project installation
+
+If you want to ensure `committed` is available to all contributors to your Go project, and you’re on Go 1.24 or newer, you can add `committed` as a tool:
 
 ```bash
-committed /path/to/COMMIT_EDITMSG
+go get -tool github.com/jaredreisinger/committed@latest
 ```
 
-> [!NOTE]
->
-> If you're using Go 1.24 or later, and added `committed` as a tool dependency, you can start it with::
->
-> ```bash
-> go tool committed /path/to/COMMIT_EDITMSG
-> ```
+This adds `committed` as a tool to your project’s `go.mod`, and any `go mod download` or `go mod tidy` command will ensure that it is downloaded and available.
 
+To use it, invoke `go tool committed`. You can configure your repo to _always_ use `committed` for editing commit messages by setting `core.editor`:
+
+```bash
+git config set --local core.editor "go tool committed"
+```
+
+Let your contributors know that they can also set `core.editor` the same way.
 
 ## Configuration
 
-The tool automatically detects conventional commit configuration from:
+`committed` automatically detects conventional commit configuration from:
 
 1. `.commitlintrc.json`
 2. `.commitlintrc.{yaml,yml}`
@@ -98,33 +84,32 @@ The tool automatically detects conventional commit configuration from:
 ```json
 {
   "rules": {
-    "type-enum": [2, "always", ["feat", "fix", "docs", "style", "refactor", "perf", "test", "chore", "revert"]],
+    "type-enum": [
+      2,
+      "always",
+      [
+        "feat",
+        "fix",
+        "docs",
+        "style",
+        "refactor",
+        "perf",
+        "test",
+        "chore",
+        "revert"
+      ]
+    ],
     "subject-max-length": [2, "always", 72]
   }
 }
 ```
 
-## Features
+## Additional options
 
-- Interactive TUI for composing conventional commits
-- (TODO) Automatic detection of project conventions
-- Pre-population from existing commit messages
-- (TODO) Real-time validation with helpful error messages
-- Support for conventional commit format with type, scope, description, and body
+> [!WARNING]
+>
+> TBD / NYI — I’m planning to add CLI flags to allow for additional customization, like choosing to directly edit the “type” field vs. using the type picker.  Those will get documented here once they’re implemented.
 
-## Development
+## Want to help? Have feedback?
 
-This project leverages [`task`](https://taskfile.dev) to manage testing and building.
-
-```bash
-# Run tests
-task test
-
-# Build
-task build
-
-# Install locally
-task install
-```
-
-Also, tool dependencies (like gcov2lcov) are now managed via the ([as of Go 1.24](https://go.dev/doc/modules/managing-dependencies#tools)) `go get -tool ...` command, so things like `go mod tidy` will automatically fetch them. Additionally, there is a `task prepare` command that functions semantically like `npm install`... it fetches dependencies and performs other one-time post-clone steps.
+Read the [contribution guidelines](docs/CONTRIBUTING.md).

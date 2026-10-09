@@ -50,12 +50,25 @@ When suggesting a new enhancement, please be as detailed as possible:
 - **Explain why this problem might be of general interest** and not an isolated one-off solution to your specific problem. (If you feel it's more of a one-off situation, you should still feel free to open an issue so we can discuss possible solutions!)
 - **Include the version number of committed** that you're using.
 
-### Pull requests
+### Pull requests / development
 
-I'm a big fan of automating as much as possible; this means that where other projects might have prescriptive style guides you need to follow, most of committed's requirements are automatically applied by tooling. Most of the time, your editor (VSCode, Atom, etc.) will simply take care of this for you, and you won't even need to think about it. If you have any concerns, you can run the following commands before committing:
+Once you’ve done a `go mod download` to retrieve all of the dependencies, you’ll also have all of the additional tooling you need to build and test. This project leverages [`task`](https://taskfile.dev), installed as a Go tool, to manage testing and building:
+
+```bash
+# Run tests
+go tool task test
+
+# Build
+go tool task build
+
+# Install locally
+go tool task install
+```
 
 > [!NOTE]
 >
-> TBD... Since committed isn't yet mature enough to rely on for self-enforcement, using it isn't a requirement or even a recommendation.  _Eventually_, it will be.
+> If you already have `task` installed, you can shorten these from `go tool task ...` to just `task ...`.
 
-Your commit message should follow the [Conventional Commits](https://www.conventionalcommits.org) standard. (But honestly, if the commit message isn't in the "standard" form, don't worry about it too much... I can adjust the PR to ensure that the right things happen.)
+Please make sure your commit messages follow the [Conventional Commits](https://www.conventionalcommits.org) standard, and use your PR to describe the specific problem you are trying to solve, or the feature you are adding and why it’s a benefit.
+
+And thanks!
