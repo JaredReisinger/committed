@@ -4,6 +4,7 @@ import (
 	"image/color"
 
 	"charm.land/lipgloss/v2"
+	"github.com/jaredreisinger/committed/pkg/bubbles/text"
 )
 
 // TODO: we can choose our colors and use lighten/darken to create the blurred
@@ -108,16 +109,16 @@ var (
 
 	placeholderStyle = lipgloss.NewStyle().Foreground(defaultColors[defaultStatus][focused][placeholder]).Italic(true)
 
-	defaultTextStyles = textStyles{
-		Focused: textPartStyles{
+	defaultTextStyles = text.Styles{
+		Focused: text.PartStyles{
 			Text:        lipgloss.NewStyle().Foreground(defaultColors[defaultStatus][focused][foreground]),
 			Placeholder: placeholderStyle,
 		},
-		Blurred: textPartStyles{
+		Blurred: text.PartStyles{
 			Text:        lipgloss.NewStyle().Foreground(defaultColors[defaultStatus][blurred][foreground]),
 			Placeholder: placeholderStyle,
 		},
-		Cursor: textCursorStyle{
+		Cursor: text.CursorStyle{
 			Color: defaultColors[defaultStatus][focused][cursor],
 		},
 	}

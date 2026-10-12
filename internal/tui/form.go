@@ -10,6 +10,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
+	"github.com/jaredreisinger/committed/pkg/bubbles/text"
 	"github.com/jaredreisinger/committed/pkg/commit"
 	"github.com/jaredreisinger/committed/pkg/config"
 	"github.com/jaredreisinger/committed/pkg/teautil"
@@ -128,12 +129,12 @@ func newForm(cfg *config.Config, existingMsg *commit.Message) mainForm {
 		// pure-display component.)
 
 		children: teautil.NewRouter(map[field]tea.Model{
-			typeField:   newTextModel(false, "type", initialType).SetCharLimit(limits.typeWidth.max),
+			typeField:   text.New(false, "type", initialType).SetCharLimit(limits.typeWidth.max),
 			typeList:    list,
-			scopeField:  newTextModel(false, "scope", initialScope).SetCharLimit(limits.scopeWidth.max),
-			descField:   newTextModel(false, "description", initialDesc).SetCharLimit(limits.descWidth.max),
-			bodyField:   newTextModel(true, "message body", initialBody).SetMaxContentHeight(100).SetDynamicHeight(true).SetMinHeight(4),
-			footerField: newTextModel(true, "footer", initialFooter).SetMaxContentHeight(50).SetMinHeight(1),
+			scopeField:  text.New(false, "scope", initialScope).SetCharLimit(limits.scopeWidth.max),
+			descField:   text.New(false, "description", initialDesc).SetCharLimit(limits.descWidth.max),
+			bodyField:   text.New(true, "message body", initialBody).SetMaxContentHeight(100).SetDynamicHeight(true).SetMinHeight(4),
+			footerField: text.New(true, "footer", initialFooter).SetMaxContentHeight(50).SetMinHeight(1),
 		}),
 
 		fieldErrs: make(map[field]error, maxField),
@@ -147,7 +148,7 @@ func newForm(cfg *config.Config, existingMsg *commit.Message) mainForm {
 
 	// perform initial validation?
 	for f, child := range form.children.All() {
-		t, ok := child.(textModel)
+		t, ok := child.(text.Model)
 		if ok {
 			form = form.validate(f, t.Value())
 		}
@@ -190,7 +191,7 @@ func (form mainForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// tricks to ensure the field isn't scrolled weirdly.
 		switch form.focusedField {
 		case typeField, scopeField:
-			t2 := form.children.MustGet(form.focusedField).(textModel).MoveToBegin().MoveToEnd()
+			t2 := form.children.MustGet(form.focusedField).(text.Model).MoveToBegin().MoveToEnd()
 			form.children = form.children.Set(form.focusedField, t2)
 		}
 
@@ -211,19 +212,19 @@ func (form mainForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if msgT.Key == typeList {
 				// The MoveToBegin/MoveToEnd ensures we don't have a weirdly
 				// scrolled field afterwards
-				t2 := form.children.MustGet(typeField).(textModel).SetValue(innerMsg.selectedItem).MoveToBegin()
+				t2 := form.children.MustGet(typeField).(text.Model).SetValue(innerMsg.selectedItem).MoveToBegin()
 				form.children = form.children.Set(typeField, t2)
 				// changing the type *can* change the layout
 				form = form.resize(form.winWidth, form.winHeight)
-				t2 = form.children.MustGet(typeField).(textModel).MoveToEnd()
+				t2 = form.children.MustGet(typeField).(text.Model).MoveToEnd()
 				form.children = form.children.Set(typeField, t2)
 				handled = true
 
 				// We also need to fake a "field changed" message!
-				cmds = append(cmds, teautil.Wrap(SendTextModelValueChanged(t2.Value()), typeField))
+				cmds = append(cmds, teautil.Wrap(text.SendValueChanged(t2.Value()), typeField))
 			}
 
-		case textModelValueChanged:
+		case text.ValueChanged:
 			slog.Debug("text model value changed", "field", msgT.Key, "value", innerMsg.Value)
 			form = form.validate(msgT.Key, innerMsg.Value)
 			handled = true // we don't let this percolate back down, do we?
@@ -277,12 +278,12 @@ func (form mainForm) resize(winWidth int, winHeight int) mainForm {
 	form.winWidth = winWidth
 	form.winHeight = winHeight
 
-	typ := form.children.MustGet(typeField).(textModel)
+	typ := form.children.MustGet(typeField).(text.Model)
 	// TODO: size typeList field here as well!
-	scope := form.children.MustGet(scopeField).(textModel)
-	desc := form.children.MustGet(descField).(textModel)
-	body := form.children.MustGet(bodyField).(textModel)
-	footer := form.children.MustGet(footerField).(textModel)
+	scope := form.children.MustGet(scopeField).(text.Model)
+	desc := form.children.MustGet(descField).(text.Model)
+	body := form.children.MustGet(bodyField).(text.Model)
+	footer := form.children.MustGet(footerField).(text.Model)
 
 	// Set up the calculateSizes structure... could we cache a lot of this?
 	// Might need to alter the constraints to not include current content size.
@@ -329,7 +330,7 @@ func (form mainForm) resize(winWidth int, winHeight int) mainForm {
 
 // nominalLength handles ensuring there's space for the placeholder when there's
 // no content
-func nominalLength(t textModel, considerPlaceholder bool) int {
+func nominalLength(t text.Model, considerPlaceholder bool) int {
 	val := t.Value()
 	if val == "" && considerPlaceholder {
 		val = t.Placeholder()
@@ -495,7 +496,7 @@ func (form mainForm) View() tea.View {
 	for f, child := range form.children.All() {
 		var info info
 
-		t, ok := child.(textModel)
+		t, ok := child.(text.Model)
 		if ok {
 			slog.Debug("getting child view content", "child", f, "width", t.Width(), "minWidth", t.MinWidth(), "content", t.Value())
 		}
@@ -521,7 +522,7 @@ func (form mainForm) View() tea.View {
 		}
 
 		// TODO: make an interface for styling single/multi...
-		if f == typeList || child.(textModel).isArea {
+		if f == typeList || child.(text.Model).IsArea() {
 			childKind = multi
 		}
 
@@ -578,7 +579,7 @@ func (form mainForm) View() tea.View {
 	helpKeys := buildHelpKeys(keyBindings)
 
 	// For the top line, we omit unused scope unless it has focus
-	showScope := form.focusedField == scopeField || form.children.MustGet(scopeField).(textModel).Value() != ""
+	showScope := form.focusedField == scopeField || form.children.MustGet(scopeField).(text.Model).Value() != ""
 	header := lipgloss.JoinHorizontal(
 		lipgloss.Top,
 		" ", // one space to align body left border
@@ -647,7 +648,7 @@ func (form mainForm) Result() (*commit.Message, error) {
 		if f == typeList {
 			continue
 		}
-		texts[f] = strings.TrimSpace(t.(textModel).Value())
+		texts[f] = strings.TrimSpace(t.(text.Model).Value())
 	}
 
 	// if !m.done {

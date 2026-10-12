@@ -1,218 +1,32 @@
-package tui
+// Package text normalizes the interface between charmbracelet/bubbles's
+// [textinput.Model] and [textarea.Model], also fixing those up in places where
+// they break the strict ELM/model paradigm.
+package text
 
 import (
-	"fmt"
-	"image/color"
 	"log/slog"
 
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/textarea"
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 )
 
-// Neither the textinput nor textarea bubbles properly implement tea.Model, so
-// we shim them to fix them up.  It just so happens they are broken in the same
-// way (no Init(), Update() returns the concrete model instead of the interface,
-// and View() returns a string), but it's not clear we need a consolidated shim.
-//
-// We also define a New() function to make setting the initial values a little
-// easier.
-//
-// Can we define a common base? It'd be handy!
-
-// ===== textinput ============================================================
-
-// textinputModel shims and fixes [textinput.Model] to be a proper [tea.Model].
-// It also adds a "minimum width" feature which we need.
-type textinputModel struct {
-	textinput.Model
-	minWidth int
-}
-
-func newTextInput(placeholder string) textinputModel {
-	m := textinput.New()
-	m.Prompt = ""
-	m.Placeholder = placeholder
-
-	m.SetStyles(textinput.Styles{
-		Focused: textinput.StyleState{
-			Text:        defaultTextStyles.Focused.Text,
-			Placeholder: defaultTextStyles.Focused.Placeholder,
-		},
-		Blurred: textinput.StyleState{
-			Text:        defaultTextStyles.Blurred.Text,
-			Placeholder: defaultTextStyles.Blurred.Placeholder,
-		},
-		Cursor: textinput.CursorStyle{
-			Color: defaultTextStyles.Cursor.Color,
-		},
-	})
-
-	return textinputModel{m, len(placeholder)}
-}
-
-// static compile-time check that the shim meets the interface
-var _ tea.Model = textinputModel{}
-
-func (t textinputModel) Init() tea.Cmd { return nil }
-
-func (t textinputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	inner, cmd := t.Model.Update(msg)
-	return textinputModel{inner, t.minWidth}, cmd
-}
-
-func (t textinputModel) View() tea.View {
-	origWidth := t.Model.Width()
-	if origWidth < t.minWidth {
-		slog.Debug("textinput temporarily bumping width",
-			"from", origWidth,
-			"to", t.minWidth,
-			"content", fmt.Sprintf("[%s]", t.Value()),
-			"placeholder", fmt.Sprintf("[%s]", t.Placeholder),
-		)
-		t.Model.SetWidth(t.minWidth)
-	}
-	view := t.Model.View()
-	t.Model.SetWidth(origWidth) // t.Model isn't immutable, sadly
-
-	// t.Model.View() *will* render an extra character for the cursor often, so
-	// we check to see if it has focus or not, and potentially trim it.
-	contentWidth := len(t.Model.Value())
-	expectWidth := max(t.minWidth, contentWidth)
-	if origWidth > 0 {
-		expectWidth = min(expectWidth, origWidth)
-	}
-	viewWidth := lipgloss.Width(view)
-	focused := t.Model.Focused()
-
-	slog.Debug("checking textinput padding",
-		"width", origWidth,
-		"minWidth", t.minWidth,
-		"contentWidth", contentWidth,
-		"expectWidth", expectWidth,
-		"view", fmt.Sprintf("[%s]", view),
-		"viewWidth", viewWidth,
-		"focused", focused,
-	)
-	if viewWidth > expectWidth && !t.Model.Focused() {
-		// dead-reckon that we *always* trim one character...
-		correctWidth := viewWidth - 1
-		if expectWidth > 0 {
-			correctWidth = expectWidth
-		}
-		view = lipgloss.NewStyle().Width(correctWidth).Render(view)
-	} else if viewWidth < t.minWidth {
-		view = lipgloss.NewStyle().PaddingRight(t.minWidth - viewWidth).Render(view)
-	}
-
-	return tea.NewView(view)
-}
-
-func (t textinputModel) MinWidth() int {
-	return t.minWidth
-}
-
-func (t textinputModel) SetMinWidth(w int) textinputModel {
-	// sort of like SetWidth, but does not clamp maximum
-	return textinputModel{t.Model, w}
-}
-
-func (t textinputModel) KeyMap() textinput.KeyMap {
-	return t.Model.KeyMap
-}
-
-func (t textinputModel) SetKeyMap(keys textinput.KeyMap) textinputModel {
-	t2 := t.Model
-	t2.KeyMap = keys
-	return textinputModel{t2, t.minWidth}
-}
-
-// ===== textarea =============================================================
-
-// textareaModel shims and fixes [textarea.Model] to be a proper [tea.Model]
-type textareaModel struct {
-	textarea.Model
-}
-
-func newTextArea(placeholder string) textareaModel {
-	m := textarea.New()
-	m.Prompt = ""
-	m.ShowLineNumbers = false
-	m.Placeholder = placeholder
-	m.DynamicHeight = true
-	m.MinHeight = 10 //?
-
-	m.SetStyles(textarea.Styles{
-		Focused: textarea.StyleState{
-			Base:        defaultTextStyles.Focused.Text,
-			Text:        defaultTextStyles.Focused.Text,
-			Placeholder: defaultTextStyles.Focused.Placeholder,
-		},
-		Blurred: textarea.StyleState{
-			Base:        defaultTextStyles.Blurred.Text,
-			Text:        defaultTextStyles.Blurred.Text,
-			Placeholder: defaultTextStyles.Blurred.Placeholder,
-		},
-		Cursor: textarea.CursorStyle{
-			Color: defaultTextStyles.Cursor.Color,
-		},
-	})
-
-	return textareaModel{m}
-}
-
-// static compile-time check that the shim meets the interface
-var _ tea.Model = textareaModel{}
-
-func (t textareaModel) Init() tea.Cmd { return nil }
-
-func (t textareaModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	inner, cmd := t.Model.Update(msg)
-	return textareaModel{inner}, cmd
-}
-
-func (t textareaModel) View() tea.View {
-	// textarea doesn't always render up to its minimum height?
-	view := t.Model.View()
-	_, h := lipgloss.Size(view)
-	if h < t.Model.MinHeight {
-		slog.Warn("textarea rendering too short", "minHeight", t.Model.MinHeight, "renderedHeight", h, "view", view)
-		view = lipgloss.NewStyle().PaddingBottom(t.Model.MinHeight - h).Render(view)
-	} else {
-		slog.Debug("textarea rendering OK", "minHeight", t.Model.MinHeight, "renderedHeight", h, "view", view)
-	}
-	return tea.NewView(view)
-}
-
-func (t textareaModel) KeyMap() textarea.KeyMap {
-	return t.Model.KeyMap
-}
-
-func (t textareaModel) SetKeyMap(keys textarea.KeyMap) textareaModel {
-	t2 := t.Model
-	t2.KeyMap = keys
-	return textareaModel{t2}
-}
-
-// ===== textModel ============================================================
-
-// textModel attempts to simplify the life of the consumer at the cost of a more
-// complicated model implementation.  A textModel is one and only one of
+// text.Model attempts to simplify the life of the consumer at the cost of a
+// more complicated model implementation.  A Model is one and only one of
 // textinput.Model or textarea.Model, which have very, very similar APIs (at
 // least the parts we're using).
-type textModel struct {
+type Model struct {
 	isArea bool
 	input  textinputModel
 	area   textareaModel
 	keymap textModelKeyMap
 }
 
-func newTextModel(isArea bool, placeholder string, initial string) textModel {
+func New(isArea bool, placeholder string, initial string) Model {
 	// it is somewhat absurd to create both, but we'll be eating that memory
 	// anyway and it makes the logic way easier here
-	t := textModel{
+	t := Model{
 		isArea: isArea,
 		input:  newTextInput(placeholder),
 		area:   newTextArea(placeholder),
@@ -228,22 +42,26 @@ func newTextModel(isArea bool, placeholder string, initial string) textModel {
 }
 
 // static compile-time check that the shim meets the interface
-var _ tea.Model = textModel{}
+var _ tea.Model = Model{}
 
 // "public" messages
-type textModelValueChanged struct {
+type ValueChanged struct {
 	Value string
 }
 
-func SendTextModelValueChanged(value string) tea.Cmd {
+func SendValueChanged(value string) tea.Cmd {
 	return func() tea.Msg {
-		return textModelValueChanged{value}
+		return ValueChanged{value}
 	}
 }
 
-func (t textModel) Init() tea.Cmd { return nil }
+func (t Model) IsArea() bool {
+	return t.isArea
+}
 
-func (t textModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (t Model) Init() tea.Cmd { return nil }
+
+func (t Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var input textinputModel
 	var area textareaModel
 
@@ -260,18 +78,18 @@ func (t textModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		area = m.(textareaModel)
 	}
 
-	t2 := textModel{t.isArea, input, area, t.keymap}
+	t2 := Model{t.isArea, input, area, t.keymap}
 
 	after := t2.Value()
 
 	if after != before {
-		cmd = tea.Batch(cmd, SendTextModelValueChanged(after))
+		cmd = tea.Batch(cmd, SendValueChanged(after))
 	}
 
 	return t2, cmd
 }
 
-func (t textModel) View() tea.View {
+func (t Model) View() tea.View {
 	if !t.isArea {
 		return t.input.View()
 	}
@@ -279,18 +97,18 @@ func (t textModel) View() tea.View {
 	return t.area.View()
 }
 
-func (t textModel) clone() textModel {
+func (t Model) clone() Model {
 	// slog.Debug("cloning textModel", "isArea", t.isArea)
 
 	// can we just return t by value?
-	return textModel{t.isArea, t.input, t.area, t.keymap}
+	return Model{t.isArea, t.input, t.area, t.keymap}
 }
 
 // Other textinput/textarea APIs we need to shim...in the underlying models,
 // some of these are just exported properties. In textModel, it *must* be
 // getter/setter methods.
 
-func (t textModel) Placeholder() string {
+func (t Model) Placeholder() string {
 	if !t.isArea {
 		return t.input.Placeholder
 	}
@@ -298,7 +116,7 @@ func (t textModel) Placeholder() string {
 	return t.area.Placeholder
 }
 
-func (t textModel) Value() string {
+func (t Model) Value() string {
 	if !t.isArea {
 		return t.input.Value()
 	}
@@ -306,7 +124,7 @@ func (t textModel) Value() string {
 	return t.area.Value()
 }
 
-func (t textModel) SetValue(value string) textModel {
+func (t Model) SetValue(value string) Model {
 	t2 := t.clone()
 
 	// before := t2.Value()
@@ -329,7 +147,7 @@ func (t textModel) SetValue(value string) textModel {
 	return t2
 }
 
-func (t textModel) MoveToBegin() textModel {
+func (t Model) MoveToBegin() Model {
 	t2 := t.clone()
 	if !t.isArea {
 		t2.input.CursorStart()
@@ -339,7 +157,7 @@ func (t textModel) MoveToBegin() textModel {
 	return t2
 }
 
-func (t textModel) MoveToEnd() textModel {
+func (t Model) MoveToEnd() Model {
 	t2 := t.clone()
 	if !t.isArea {
 		t2.input.CursorEnd()
@@ -349,7 +167,7 @@ func (t textModel) MoveToEnd() textModel {
 	return t2
 }
 
-func (t textModel) Height() int {
+func (t Model) Height() int {
 	if !t.isArea {
 		return 1 // ? padding?
 	}
@@ -357,7 +175,7 @@ func (t textModel) Height() int {
 	return t.area.Height()
 }
 
-func (t textModel) SetHeight(height int) textModel {
+func (t Model) SetHeight(height int) Model {
 	if !t.isArea {
 		// not allowed
 		return t
@@ -368,7 +186,7 @@ func (t textModel) SetHeight(height int) textModel {
 	return t2
 }
 
-func (t textModel) MinHeight() int {
+func (t Model) MinHeight() int {
 	if !t.isArea {
 		return 1 // ? padding?
 	}
@@ -376,7 +194,7 @@ func (t textModel) MinHeight() int {
 	return t.area.MinHeight
 }
 
-func (t textModel) SetMinHeight(height int) textModel {
+func (t Model) SetMinHeight(height int) Model {
 	if !t.isArea {
 		// not allowed
 		return t
@@ -387,7 +205,7 @@ func (t textModel) SetMinHeight(height int) textModel {
 	return t2
 }
 
-func (t textModel) MaxHeight() int {
+func (t Model) MaxHeight() int {
 	if !t.isArea {
 		return 1 // ? padding?
 	}
@@ -395,7 +213,7 @@ func (t textModel) MaxHeight() int {
 	return t.area.MaxHeight
 }
 
-func (t textModel) SetMaxHeight(height int) textModel {
+func (t Model) SetMaxHeight(height int) Model {
 	if !t.isArea {
 		// not allowed
 		return t
@@ -406,7 +224,7 @@ func (t textModel) SetMaxHeight(height int) textModel {
 	return t2
 }
 
-func (t textModel) MaxContentHeight() int {
+func (t Model) MaxContentHeight() int {
 	if !t.isArea {
 		return 1 // ? padding?
 	}
@@ -414,7 +232,7 @@ func (t textModel) MaxContentHeight() int {
 	return t.area.MaxContentHeight
 }
 
-func (t textModel) SetMaxContentHeight(height int) textModel {
+func (t Model) SetMaxContentHeight(height int) Model {
 	if !t.isArea {
 		// not allowed
 		return t
@@ -425,7 +243,7 @@ func (t textModel) SetMaxContentHeight(height int) textModel {
 	return t2
 }
 
-func (t textModel) DynamicHeight() bool {
+func (t Model) DynamicHeight() bool {
 	if !t.isArea {
 		return false
 	}
@@ -433,7 +251,7 @@ func (t textModel) DynamicHeight() bool {
 	return t.area.DynamicHeight
 }
 
-func (t textModel) SetDynamicHeight(b bool) textModel {
+func (t Model) SetDynamicHeight(b bool) Model {
 	if !t.isArea {
 		// not allowed!
 		return t
@@ -445,7 +263,7 @@ func (t textModel) SetDynamicHeight(b bool) textModel {
 	return t2
 }
 
-func (t textModel) Width() int {
+func (t Model) Width() int {
 	if !t.isArea {
 		// for textinput CharLimit === MaxWidth
 		return t.input.Width()
@@ -454,7 +272,7 @@ func (t textModel) Width() int {
 	return t.area.Width()
 }
 
-func (t textModel) SetWidth(width int) textModel {
+func (t Model) SetWidth(width int) Model {
 	t2 := t.clone()
 
 	if !t.isArea {
@@ -466,7 +284,7 @@ func (t textModel) SetWidth(width int) textModel {
 	return t2
 }
 
-func (t textModel) MinWidth() int {
+func (t Model) MinWidth() int {
 	if !t.isArea {
 		// for textinput CharLimit === MaxWidth
 		return t.input.MinWidth()
@@ -476,7 +294,7 @@ func (t textModel) MinWidth() int {
 
 }
 
-func (t textModel) SetMinWidth(width int) textModel {
+func (t Model) SetMinWidth(width int) Model {
 	t2 := t.clone()
 
 	if !t.isArea {
@@ -490,10 +308,10 @@ func (t textModel) SetMinWidth(width int) textModel {
 	return t2
 }
 
-// weird that textinput has width/setwidth, and textarea has
-// maxwidth/setmaxwidth... need to rationalize these!
+// weird that textinput has Width/SetWidth, and textarea has
+// MaxWidth/SetMaxWidth... need to rationalize these!
 
-func (t textModel) MaxWidth() int {
+func (t Model) MaxWidth() int {
 	if !t.isArea {
 		// for textinput Width === MaxWidth
 		return t.input.Width()
@@ -502,7 +320,7 @@ func (t textModel) MaxWidth() int {
 	return t.area.MaxWidth
 }
 
-func (t textModel) SetMaxWidth(width int) textModel {
+func (t Model) SetMaxWidth(width int) Model {
 	t2 := t.clone()
 
 	if !t.isArea {
@@ -514,7 +332,7 @@ func (t textModel) SetMaxWidth(width int) textModel {
 	return t2
 }
 
-func (t textModel) CharLimit() int {
+func (t Model) CharLimit() int {
 	if !t.isArea {
 		// for textinput CharLimit === MaxWidth
 		return t.input.CharLimit
@@ -523,7 +341,7 @@ func (t textModel) CharLimit() int {
 	return t.area.CharLimit
 }
 
-func (t textModel) SetCharLimit(width int) textModel {
+func (t Model) SetCharLimit(width int) Model {
 	t2 := t.clone()
 
 	if !t.isArea {
@@ -535,7 +353,7 @@ func (t textModel) SetCharLimit(width int) textModel {
 	return t2
 }
 
-func (t textModel) Focus() (tea.Model, tea.Cmd) {
+func (t Model) Focus() (tea.Model, tea.Cmd) {
 	t2 := t.clone()
 	var cmd tea.Cmd
 
@@ -548,7 +366,7 @@ func (t textModel) Focus() (tea.Model, tea.Cmd) {
 	return t2, cmd
 }
 
-func (t textModel) Blur() (tea.Model, tea.Cmd) {
+func (t Model) Blur() (tea.Model, tea.Cmd) {
 	t2 := t.clone()
 	var cmd tea.Cmd
 
@@ -651,7 +469,7 @@ func DefaultTextModelKeyMap() textModelKeyMap {
 	// *Should* we include keys in the map that aren't described? The concern is
 	// "magic" sequences that we might want for use later.
 	return textModelKeyMap{
-		// keys: ␤ ␈ ␡ ← ↑ → ↓ ↲ || NERDFONT:            
+		// keys: ␤ ␈ ␡ ← ↑ → ↓ ↲ || NerdFont:            
 		AcceptSuggestion:           key.NewBinding(key.WithDisabled()), // unbound would be better?
 		CapitalizeWordForward:      newBinding("alt+c", "capitalize word forward", "alt+c"),
 		CharacterBackward:          newBinding("←/ctrl+b", "char backward", "left", "ctrl+b"),
@@ -753,21 +571,21 @@ func (keys textModelKeyMap) ForTextArea() textarea.KeyMap {
 	}
 }
 
-func (t textModel) KeyMap() textModelKeyMap {
+func (t Model) KeyMap() textModelKeyMap {
 	return t.keymap
 }
 
-func (t textModel) SetKeyMap(keys textModelKeyMap) textModel {
+func (t Model) SetKeyMap(keys textModelKeyMap) Model {
 	input2 := t.input.SetKeyMap(keys.ForTextInput())
 	area2 := t.area.SetKeyMap(keys.ForTextArea())
-	return textModel{t.isArea, input2, area2, keys}
+	return Model{t.isArea, input2, area2, keys}
 }
 
 // We don't really care about the full map as much as we care about the
 // key.Bindings for help, and we return it in the order we care about.  We also
 // don't plumb this through to textinputModel and textareaModel, because then we
 // have more places to update if we change the order.
-func (t textModel) GetKeyBindings() []key.Binding {
+func (t Model) GetKeyBindings() []key.Binding {
 	var bindings []key.Binding
 	commonBindings := []key.Binding{
 		// t.keymap.CharacterBackward,
@@ -805,57 +623,28 @@ func (t textModel) GetKeyBindings() []key.Binding {
 	return bindings
 }
 
-// unified style support
-type textStyles struct {
-	Focused textPartStyles
-	Blurred textPartStyles
-	Cursor  textCursorStyle
-}
-
-type textPartStyles struct {
-	Text        lipgloss.Style
-	Placeholder lipgloss.Style
-	// Prompt      lipgloss.Style // we never use prompt
-
-	// textinput ignored styles...
-
-	// Suggestion lipgloss.Style
-
-	// textarea ignored styles...
-
-	// Base             lipgloss.Style // do we need this textarea style?
-	// LineNumber       lipgloss.Style
-	// CursorLineNumber lipgloss.Style
-	// CursorLine       lipgloss.Style
-	// EndOfBuffer      lipgloss.Style
-}
-
-type textCursorStyle struct {
-	Color color.Color
-}
-
-func (t textModel) Styles() textStyles {
-	var s textStyles
+func (t Model) Styles() Styles {
+	var s Styles
 	if !t.isArea {
 		i := t.input.Styles()
-		s = textStyles{
-			Focused: textPartStyles{
+		s = Styles{
+			Focused: PartStyles{
 				Text:        i.Focused.Text,
 				Placeholder: i.Focused.Placeholder,
 			},
-			Blurred: textPartStyles{
+			Blurred: PartStyles{
 				Text:        i.Blurred.Text,
 				Placeholder: i.Blurred.Placeholder,
 			},
 		}
 	} else {
 		a := t.area.Styles()
-		s = textStyles{
-			Focused: textPartStyles{
+		s = Styles{
+			Focused: PartStyles{
 				Text:        a.Focused.Text,
 				Placeholder: a.Focused.Placeholder,
 			},
-			Blurred: textPartStyles{
+			Blurred: PartStyles{
 				Text:        a.Blurred.Text,
 				Placeholder: a.Blurred.Placeholder,
 			},
@@ -866,7 +655,7 @@ func (t textModel) Styles() textStyles {
 	return s
 }
 
-func (t textModel) SetStyles(s textStyles) textModel {
+func (t Model) SetStyles(s Styles) Model {
 	t2 := t.clone()
 
 	if !t.isArea {
