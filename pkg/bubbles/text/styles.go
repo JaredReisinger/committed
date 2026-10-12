@@ -85,7 +85,7 @@ var (
 var (
 	placeholderStyle = lipgloss.NewStyle().Foreground(defaultColors[focused][placeholder]).Italic(true)
 
-	defaultTextStyles = Styles{
+	defaultStyles = Styles{
 		Focused: PartStyles{
 			Text:        lipgloss.NewStyle().Foreground(defaultColors[focused][foreground]),
 			Placeholder: placeholderStyle,

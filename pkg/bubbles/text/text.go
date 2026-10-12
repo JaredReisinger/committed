@@ -1,6 +1,8 @@
 // Package text normalizes the interface between charmbracelet/bubbles's
 // [textinput.Model] and [textarea.Model], also fixing those up in places where
-// they break the strict ELM/model paradigm.
+// they break the strict ELM/model paradigm.  One place where text.Model differs
+// greatly is that it *dies not* render its own border/decoration. That is left
+// entirely to the container.
 package text
 
 import (

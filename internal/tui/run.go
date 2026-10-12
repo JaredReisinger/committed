@@ -12,7 +12,7 @@ import (
 var testHookProgram *tea.Program
 
 func Run(cfg *config.Config, existingMsg *commit.Message) (*commit.Message, error) {
-	m := newForm(cfg, existingMsg)
+	m := newCommitForm(cfg, existingMsg)
 
 	p := tea.NewProgram(m)
 	testHookProgram = p
@@ -22,7 +22,7 @@ func Run(cfg *config.Config, existingMsg *commit.Message) (*commit.Message, erro
 		return nil, err
 	}
 
-	tuiModel, ok := finalModel.(mainForm)
+	tuiModel, ok := finalModel.(commitForm)
 	if !ok {
 		return nil, errors.WithMessage(err, "unexpected model type")
 	}

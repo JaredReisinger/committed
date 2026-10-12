@@ -10,6 +10,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
+	"github.com/jaredreisinger/committed/pkg/bubbles/listpicker"
 	"github.com/jaredreisinger/committed/pkg/bubbles/text"
 	"github.com/jaredreisinger/committed/pkg/commit"
 	"github.com/jaredreisinger/committed/pkg/config"
@@ -31,13 +32,13 @@ const (
 	maxField
 )
 
-// mainForm represents the TUI state for conventional commit composition.
+// commitForm represents the TUI state for conventional commit composition.
 //
 // It includes both local state and also the child models (which are, in a
 // sense, also a kind of local state.)   The original AI-created class was an
 // absolute mess, with no sense of immutability at all.  The addition of
 // [teautil.Router] is helping a ton, however.
-type mainForm struct {
+type commitForm struct {
 	config      *config.Config
 	existingMsg *commit.Message // just for init, don't persist
 
@@ -56,9 +57,9 @@ type mainForm struct {
 	err error // should this be validation error(s) as well?
 }
 
-// newForm creates a new TUI model with the given configuration and optional
-// existing message.
-func newForm(cfg *config.Config, existingMsg *commit.Message) mainForm {
+// newCommitForm creates a new TUI model with the given configuration and
+// optional existing message.
+func newCommitForm(cfg *config.Config, existingMsg *commit.Message) commitForm {
 	// get existing message content...
 	var initialType string
 	var initialScope string
@@ -90,7 +91,7 @@ func newForm(cfg *config.Config, existingMsg *commit.Message) mainForm {
 		footerHeight: Limits{1, 0}, // ?? really?
 	}
 
-	list := newListModel(cfg.Rules.TypeEnum.Value)
+	list := listpicker.New(cfg.Rules.TypeEnum.Value)
 	if initialType != "" {
 		var ok bool
 		list, ok = list.SetSelectedItem(initialType)
@@ -116,7 +117,7 @@ func newForm(cfg *config.Config, existingMsg *commit.Message) mainForm {
 		footerField,
 	}
 
-	form := mainForm{
+	form := commitForm{
 		config:      cfg,
 		existingMsg: existingMsg,
 
@@ -158,7 +159,7 @@ func newForm(cfg *config.Config, existingMsg *commit.Message) mainForm {
 }
 
 // Init initializes the bubbletea program.
-func (form mainForm) Init() tea.Cmd {
+func (form commitForm) Init() tea.Cmd {
 	// should other processing happen here?
 	// return textinput.Blink
 	// Set initial focus
@@ -176,7 +177,7 @@ func setFocusCmd(f field) tea.Cmd {
 }
 
 // Update handles user input and updates the model.
-func (form mainForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (form commitForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd // aggregated commands
 	var cmd tea.Cmd    // returned Cmd from delegated Update() calls
 	handled := false
@@ -208,11 +209,11 @@ func (form mainForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// added benefit of telling us which model sent the message (via the
 		// Key), which can be important to know.
 		switch innerMsg := msgT.Msg.(type) {
-		case listSelectionChangedMsg:
+		case listpicker.SelectionChangedMsg:
 			if msgT.Key == typeList {
 				// The MoveToBegin/MoveToEnd ensures we don't have a weirdly
 				// scrolled field afterwards
-				t2 := form.children.MustGet(typeField).(text.Model).SetValue(innerMsg.selectedItem).MoveToBegin()
+				t2 := form.children.MustGet(typeField).(text.Model).SetValue(innerMsg.SelectedItem).MoveToBegin()
 				form.children = form.children.Set(typeField, t2)
 				// changing the type *can* change the layout
 				form = form.resize(form.winWidth, form.winHeight)
@@ -272,7 +273,7 @@ func (form mainForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // it to be responsive to content and to focus. At the same time, we don't want
 // the sizing logic to be scattered all over the code.
 
-func (form mainForm) resize(winWidth int, winHeight int) mainForm {
+func (form commitForm) resize(winWidth int, winHeight int) commitForm {
 	slog.Debug("window resize", "width", winWidth, "height", winHeight)
 
 	form.winWidth = winWidth
@@ -342,7 +343,7 @@ func nominalLength(t text.Model, considerPlaceholder bool) int {
 
 // Validates *at least* the field/value. May validate other fields or
 // combinations in some cases.
-func (form mainForm) validate(f field, value string) mainForm {
+func (form commitForm) validate(f field, value string) commitForm {
 	// I don't love that this is a ginormous function that validates individual
 	// checks, but 🤷🏼‍♂️.  I still need to think about how to normalize the
 	// commitlint rules into the validation config for the UI.
@@ -424,7 +425,7 @@ type Focuser interface {
 }
 
 // updateFocus updates which field is currently focused.
-func (form mainForm) setFocus(focusField field) (mainForm, tea.Cmd) {
+func (form commitForm) setFocus(focusField field) (commitForm, tea.Cmd) {
 	modelMap := map[field]tea.Model{}
 	var cmds []tea.Cmd
 	var cmd tea.Cmd
@@ -467,12 +468,12 @@ func circularDelta[S ~[]E, E comparable](s S, v E, delta int) E {
 }
 
 // nextField moves to the next field.
-func (form mainForm) nextField() tea.Cmd {
+func (form commitForm) nextField() tea.Cmd {
 	return setFocusCmd(circularDelta(form.tabstops, form.focusedField, 1))
 }
 
 // prevField moves to the previous field.
-func (form mainForm) prevField() tea.Cmd {
+func (form commitForm) prevField() tea.Cmd {
 	return setFocusCmd(circularDelta(form.tabstops, form.focusedField, -1))
 }
 
@@ -481,7 +482,7 @@ type KeyBinder interface {
 }
 
 // View renders the TUI.
-func (form mainForm) View() tea.View {
+func (form commitForm) View() tea.View {
 	// TODO: would it be better to define a type for the value/valid/decoration
 	// info? I suspect that would be better than the parallel maps.
 	type info struct {
@@ -637,7 +638,7 @@ func (form mainForm) View() tea.View {
 }
 
 // Result returns the composed commit message and any error.
-func (form mainForm) Result() (*commit.Message, error) {
+func (form commitForm) Result() (*commit.Message, error) {
 	if form.err != nil {
 		return nil, form.err
 	}

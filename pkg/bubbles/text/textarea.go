@@ -31,17 +31,17 @@ func newTextArea(placeholder string) textareaModel {
 
 	m.SetStyles(textarea.Styles{
 		Focused: textarea.StyleState{
-			Base:        defaultTextStyles.Focused.Text,
-			Text:        defaultTextStyles.Focused.Text,
-			Placeholder: defaultTextStyles.Focused.Placeholder,
+			Base:        defaultStyles.Focused.Text,
+			Text:        defaultStyles.Focused.Text,
+			Placeholder: defaultStyles.Focused.Placeholder,
 		},
 		Blurred: textarea.StyleState{
-			Base:        defaultTextStyles.Blurred.Text,
-			Text:        defaultTextStyles.Blurred.Text,
-			Placeholder: defaultTextStyles.Blurred.Placeholder,
+			Base:        defaultStyles.Blurred.Text,
+			Text:        defaultStyles.Blurred.Text,
+			Placeholder: defaultStyles.Blurred.Placeholder,
 		},
 		Cursor: textarea.CursorStyle{
-			Color: defaultTextStyles.Cursor.Color,
+			Color: defaultStyles.Cursor.Color,
 		},
 	})
 

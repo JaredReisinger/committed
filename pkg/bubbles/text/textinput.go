@@ -31,15 +31,15 @@ func newTextInput(placeholder string) textinputModel {
 
 	m.SetStyles(textinput.Styles{
 		Focused: textinput.StyleState{
-			Text:        defaultTextStyles.Focused.Text,
-			Placeholder: defaultTextStyles.Focused.Placeholder,
+			Text:        defaultStyles.Focused.Text,
+			Placeholder: defaultStyles.Focused.Placeholder,
 		},
 		Blurred: textinput.StyleState{
-			Text:        defaultTextStyles.Blurred.Text,
-			Placeholder: defaultTextStyles.Blurred.Placeholder,
+			Text:        defaultStyles.Blurred.Text,
+			Placeholder: defaultStyles.Blurred.Placeholder,
 		},
 		Cursor: textinput.CursorStyle{
-			Color: defaultTextStyles.Cursor.Color,
+			Color: defaultStyles.Cursor.Color,
 		},
 	})
 

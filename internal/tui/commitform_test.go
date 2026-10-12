@@ -13,7 +13,7 @@ import (
 
 func TestNewModel(t *testing.T) {
 	cfg := config.DefaultConfig()
-	m := newForm(cfg, nil)
+	m := newCommitForm(cfg, nil)
 
 	assert.NotNil(t, m.config)
 	assert.Equal(t, typeList, m.focusedField)
@@ -33,7 +33,7 @@ func TestNewModel_WithExistingMessage(t *testing.T) {
 		Body:        "detailed description",
 	}
 
-	m := newForm(cfg, existing)
+	m := newCommitForm(cfg, existing)
 
 	typ := m.children.MustGet(typeField).(text.Model)
 	desc := m.children.MustGet(descField).(text.Model)

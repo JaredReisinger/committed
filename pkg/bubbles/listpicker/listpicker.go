@@ -1,4 +1,4 @@
-package tui
+package listpicker
 
 import (
 	"log/slog"
@@ -9,16 +9,15 @@ import (
 	"charm.land/lipgloss/v2"
 )
 
-// list is a simple picker list, meant to pick the commit type
-
-type listModel struct {
+// listpicker.Model is a simple picker list, meant to pick the commit type
+type Model struct {
 	items         []string
 	selectedIndex int
 }
 
-func newListModel(items []string) listModel {
+func New(items []string) Model {
 	slog.Debug("creating list", "items", items)
-	l := listModel{
+	l := Model{
 		items:         slices.Clone(items),
 		selectedIndex: 0,
 	}
@@ -27,37 +26,37 @@ func newListModel(items []string) listModel {
 }
 
 // static compile-time check that the type meets the interface
-var _ tea.Model = listModel{}
+var _ tea.Model = Model{}
 
-type listSelectionChangedMsg struct {
-	selectedItemIndex int
-	selectedItem      string
+type SelectionChangedMsg struct {
+	SelectedItemIndex int
+	SelectedItem      string
 }
 
-func listSelectionChangedCmd(index int, item string) tea.Cmd {
+func selectionChangedCmd(index int, item string) tea.Cmd {
 	return func() tea.Msg {
-		return listSelectionChangedMsg{
-			selectedItemIndex: index,
-			selectedItem:      item,
+		return SelectionChangedMsg{
+			SelectedItemIndex: index,
+			SelectedItem:      item,
 		}
 	}
 }
 
-func (l listModel) SelectedIndex() int {
+func (l Model) SelectedIndex() int {
 	return l.selectedIndex
 }
 
-func (l listModel) SetSelectedIndex(index int) listModel {
+func (l Model) SetSelectedIndex(index int) Model {
 	l2 := l
 	l2.selectedIndex = max(0, min(len(l2.items), index))
 	return l2
 }
 
-func (l listModel) SelectedItem() string {
+func (l Model) SelectedItem() string {
 	return l.items[l.selectedIndex]
 }
 
-func (l listModel) SetSelectedItem(item string) (listModel, bool) {
+func (l Model) SetSelectedItem(item string) (Model, bool) {
 	index := slices.Index(l.items, item)
 	if index < 0 {
 		return l, false
@@ -68,9 +67,9 @@ func (l listModel) SetSelectedItem(item string) (listModel, bool) {
 	return l2, true
 }
 
-func (l listModel) Init() tea.Cmd { return nil }
+func (l Model) Init() tea.Cmd { return nil }
 
-func (l listModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (l Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// var cmds []tea.Cmd // aggregated commands
 	var cmd tea.Cmd
 	// handled := false // do we do this, or msg = nil?
@@ -82,11 +81,11 @@ func (l listModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msgT, listKeyMap.Up):
 			// we don't use commands because it's simple?
 			l.selectedIndex = ((l.selectedIndex + len(l.items)) - 1) % len(l.items)
-			cmd = listSelectionChangedCmd(l.selectedIndex, l.items[l.selectedIndex])
+			cmd = selectionChangedCmd(l.selectedIndex, l.items[l.selectedIndex])
 
 		case key.Matches(msgT, listKeyMap.Down):
 			l.selectedIndex = (l.selectedIndex + 1) % len(l.items)
-			cmd = listSelectionChangedCmd(l.selectedIndex, l.items[l.selectedIndex])
+			cmd = selectionChangedCmd(l.selectedIndex, l.items[l.selectedIndex])
 
 			// case key.Matches(msgT, listKeyMap.SelectAndNext):
 			// 	// change parent focus?
@@ -101,13 +100,13 @@ func (l listModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return l, cmd
 }
 
-func (l listModel) View() tea.View {
+func (l Model) View() tea.View {
 	// slog.Debug("viewing list", "items", l.items)
 	lines := make([]string, 0, len(l.items))
 	for i, item := range l.items {
-		style := defaultTextStyles.Blurred.Text
+		style := defaultStyles.Blurred.Text
 		if i == l.selectedIndex {
-			style = defaultTextStyles.Focused.Text
+			style = defaultStyles.Focused.Text
 		}
 		lines = append(lines, style.Render(item))
 	}
@@ -115,7 +114,7 @@ func (l listModel) View() tea.View {
 	return tea.NewView(view)
 }
 
-func (l listModel) GetKeyBindings() []key.Binding {
+func (l Model) GetKeyBindings() []key.Binding {
 	km := listKeyMap
 	bindings := []key.Binding{
 		km.Up,
