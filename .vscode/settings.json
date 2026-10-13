@@ -28,6 +28,7 @@
         "sandboxing",
         "sboms",
         "sigstore",
+        "teatest",
         "teautil",
         "textareas",
         "textinput",

@@ -1,47 +1,63 @@
 package tui
 
 import (
-	"os"
 	"testing"
 	"time"
 
+	tea "charm.land/bubbletea/v2"
+
+	"github.com/charmbracelet/x/exp/teatest/v2"
 	"github.com/go-openapi/testify/v2/assert"
 
+	"github.com/jaredreisinger/committed/pkg/commit"
 	"github.com/jaredreisinger/committed/pkg/config"
 )
 
-func TestRun(t *testing.T) {
+func TestRunCommitForm(t *testing.T) {
 	// t.Skip("getting a `makeslice: len out of range` in textinput")
 
-	// This doesn't seem to run under GitHub Actions...
-	if os.Getenv("CI") == "true" {
-		t.Skip("TTY error trying to run in GitHub Actions")
-		return // technically not needed
-	}
+	// // This doesn't seem to run under GitHub Actions...
+	// if os.Getenv("CI") == "true" {
+	// 	t.Skip("TTY error trying to run in GitHub Actions")
+	// 	return // technically not needed
+	// }
 
 	cfg := config.DefaultConfig()
 
-	// start a goroutine to wait for testHookProgram to have a value and then
-	// wait a few seconds before quitting the program.
-	go func() {
-		for range 5 {
-			if programTestHook == nil {
-				time.Sleep(100 * time.Millisecond)
-				continue
-			}
+	m := newCommitForm(cfg, &commit.Message{})
 
-			// We can see the program!
-			time.Sleep(200 * time.Millisecond)
+	testModel := teatest.NewTestModel(t, m)
 
-			// Fancy would be to navigate and create a specific message...
-			programTestHook.Quit()
-			return
-		}
+	testModel.Send(tea.KeyPressMsg{Code: tea.KeyDown}) // build->chore
+	testModel.Send(tea.KeyPressMsg{Code: tea.KeyDown}) // chore->ci
+	testModel.Send(tea.KeyPressMsg{Code: tea.KeyDown}) // ci->docs
+	testModel.Send(tea.KeyPressMsg{Code: tea.KeyDown}) // docs->feat
+	testModel.Send(tea.KeyPressMsg{Code: tea.KeyDown}) // feat->fix
+	testModel.Send(tea.KeyPressMsg{Code: tea.KeyTab})  // accept "fix" -> scope
 
-		assert.Fail(t, "program not found")
-	}()
+	testModel.Type("foo")
 
-	msg, err := RunCommitForm(cfg, nil)
+	testModel.Send(tea.KeyPressMsg{Code: tea.KeyTab}) // scope -> desc
+
+	testModel.Type("testing 1 2 3")
+
+	testModel.Send(tea.KeyPressMsg{Code: tea.KeyTab}) // desc -> body
+
+	testModel.Type("this is the body")
+
+	testModel.Quit()
+	testModel.WaitFinished(t, teatest.WithFinalTimeout(time.Second))
+
+	finalModel := testModel.FinalModel(t)
+	commitForm2, ok := finalModel.(commitForm)
+	assert.True(t, ok)
+
+	msg, err := commitForm2.Result()
 	assert.NoError(t, err)
-	assert.Equal(t, "build: \n", msg.Format(cfg))
+	assert.Equal(t, &commit.Message{
+		Type:        "fix",
+		Scope:       "foo",
+		Description: "testing 1 2 3",
+		Body:        "this is the body",
+	}, msg)
 }

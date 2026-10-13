@@ -217,19 +217,7 @@ func (form commitForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		form = form.resize(msgT.Width, msgT.Height)
 		handled = true
 
-	case setFocusMsg:
-		// If the focus *was* type or scope, we need to play some positioning
-		// tricks to ensure the field isn't scrolled weirdly.
-		switch form.focusedField {
-		case typeField, scopeField:
-			if child, ok := form.children.Get(form.focusedField); ok {
-				if t, ok := child.(text.Model); ok {
-					t2 := t.MoveToBegin().MoveToEnd()
-					form.children = form.children.Set(form.focusedField, t2)
-				}
-			}
-		}
-
+	case setFocusMsg: // needed for Init, since we can't mutate form?
 		form, cmd = form.setFocus(msgT.field)
 		cmds = append(cmds, cmd)
 		// we also need to resize fields as focus changes...
@@ -277,12 +265,22 @@ func (form commitForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msgT, defaultKeyMap.Cancel):
 			cmds = append(cmds, tea.Interrupt)
 
+		// all focus-changing handled together
 		case key.Matches(msgT, defaultKeyMap.NextFromSingle) ||
-			key.Matches(msgT, defaultKeyMap.NextFromMulti):
-			cmds = append(cmds, form.nextField())
+			key.Matches(msgT, defaultKeyMap.NextFromMulti) ||
+			key.Matches(msgT, defaultKeyMap.Prev):
 
-		case key.Matches(msgT, defaultKeyMap.Prev):
-			cmds = append(cmds, form.prevField())
+			delta := 1
+			if key.Matches(msgT, defaultKeyMap.Prev) {
+				delta = -1
+			}
+
+			nextFocus := circularDelta(form.tabstops, form.focusedField, delta)
+
+			form, cmd = form.setFocus(nextFocus)
+			cmds = append(cmds, cmd)
+			// we also need to resize fields as focus changes...
+			form = form.resize(form.winWidth, form.winHeight)
 
 		case key.Matches(msgT, defaultKeyMap.Submit):
 			// TODO: validate?
@@ -336,7 +334,7 @@ func (form commitForm) resize(winWidth int, winHeight int) commitForm {
 
 	bounds := Size{form.winWidth, form.winHeight}
 	sizes := calculateSizes(bounds, form.limits, form.focusedField, contents)
-	slog.Info("resize",
+	slog.Debug("resize",
 		"bounds", bounds.LogValue(),
 		"limits", form.limits.LogValue(),
 		"contents", contents.LogValue(),
@@ -465,6 +463,19 @@ func (form commitForm) setFocus(focusField field) (commitForm, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	if form.focusedField != focusField {
+
+		// If the focus *was* type or scope, we need to play some positioning
+		// tricks to ensure the field isn't scrolled weirdly.
+		switch form.focusedField {
+		case typeField, scopeField:
+			if child, ok := form.children.Get(form.focusedField); ok {
+				if t, ok := child.(text.Model); ok {
+					t2 := t.MoveToBegin().MoveToEnd()
+					form.children = form.children.Set(form.focusedField, t2)
+				}
+			}
+		}
+
 		modelMap := make(map[field]tea.Model, 3)
 
 		// it's a "loop" just so we don't have to duplicate the "get from
@@ -518,16 +529,6 @@ func circularDelta[S ~[]E, E comparable](s S, v E, delta int) E {
 	l := len(s)
 	newIndex := (curIndex + (delta % l) + l) % l
 	return s[newIndex]
-}
-
-// nextField moves to the next field.
-func (form commitForm) nextField() tea.Cmd {
-	return setFocusCmd(circularDelta(form.tabstops, form.focusedField, 1))
-}
-
-// prevField moves to the previous field.
-func (form commitForm) prevField() tea.Cmd {
-	return setFocusCmd(circularDelta(form.tabstops, form.focusedField, -1))
 }
 
 type KeyBinder interface {
