@@ -46,6 +46,9 @@ const (
 	// The challenge is in figuring out "who" is responsible for the 2-value
 	// management; I think getting the layout right makes it need to be the
 	// form, but it would be nice to encapsulate the tabbing... but, meh?
+	//
+	// And... it may be overkill to do that much for footers vs. everything
+	// else.
 	footerField
 
 	// footerToken1Field
