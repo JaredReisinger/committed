@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"os"
 	"testing"
 	"time"
 
@@ -11,6 +12,12 @@ import (
 
 func TestRun(t *testing.T) {
 	// t.Skip("getting a `makeslice: len out of range` in textinput")
+
+	// This doesn't seem to run under GitHub Actions...
+	if os.Getenv("CI") == "true" {
+		t.Skip("TTY error trying to run in GitHub Actions")
+		return // technically not needed
+	}
 
 	cfg := config.DefaultConfig()
 
