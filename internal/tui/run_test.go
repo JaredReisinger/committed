@@ -10,7 +10,7 @@ import (
 )
 
 func TestRun(t *testing.T) {
-	t.Skip("getting a `makeslice: len out of range` in textinput")
+	// t.Skip("getting a `makeslice: len out of range` in textinput")
 
 	cfg := config.DefaultConfig()
 
@@ -18,21 +18,23 @@ func TestRun(t *testing.T) {
 	// wait a few seconds before quitting the program.
 	go func() {
 		for range 5 {
-			if testHookProgram == nil {
-				time.Sleep(time.Second)
+			if programTestHook == nil {
+				time.Sleep(100 * time.Millisecond)
 				continue
 			}
 
-			// we can see the program!
-			time.Sleep(time.Second * 2)
-			testHookProgram.Quit()
+			// We can see the program!
+			time.Sleep(200 * time.Millisecond)
+
+			// Fancy would be to navigate and create a specific message...
+			programTestHook.Quit()
 			return
 		}
 
 		assert.Fail(t, "program not found")
 	}()
 
-	msg, err := Run(cfg, nil)
+	msg, err := RunCommitForm(cfg, nil)
 	assert.NoError(t, err)
-	assert.Equal(t, "", msg.Format(cfg))
+	assert.Equal(t, "build: \n", msg.Format(cfg))
 }

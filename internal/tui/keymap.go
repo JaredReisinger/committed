@@ -46,6 +46,14 @@ var defaultKeyMap = keyMap{
 	),
 }
 
+var simpleEditorKeyMap = keyMap{
+	Cancel:         defaultKeyMap.Cancel,
+	NextFromSingle: key.NewBinding(key.WithDisabled()),
+	NextFromMulti:  key.NewBinding(key.WithDisabled()),
+	Prev:           key.NewBinding(key.WithDisabled()),
+	Submit:         defaultKeyMap.Submit,
+}
+
 func (k *keyMap) ShortHelp() []key.Binding {
 	return []key.Binding{
 		k.NextFromSingle,
@@ -60,11 +68,11 @@ func (k *keyMap) FullHelp() [][]key.Binding {
 	return nil
 }
 
-func buildHelpKeys(fieldKeyBindings []key.Binding) help.KeyMap {
+func buildHelpKeys(formKeyMap keyMap, fieldKeyBindings []key.Binding) help.KeyMap {
 	// combine maps
 	h := &helpMap{}
 
-	h.short = defaultKeyMap.ShortHelp()
+	h.short = formKeyMap.ShortHelp()
 	h.short = append(h.short, fieldKeyBindings...)
 
 	// For the long list, it's 6 or 7 per group, and we can tell based on the

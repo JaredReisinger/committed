@@ -1,4 +1,4 @@
-package hook
+package git
 
 import (
 	"fmt"

@@ -12,7 +12,7 @@ func TestKeyMap(t *testing.T) {
 		key.NewBinding(),
 	}
 
-	keymap := buildHelpKeys(dummyBindings)
+	keymap := buildHelpKeys(defaultKeyMap, dummyBindings)
 	assert.NotNil(t, keymap)
 
 	// short help should combine default and dummy:

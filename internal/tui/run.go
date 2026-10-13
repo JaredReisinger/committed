@@ -9,13 +9,13 @@ import (
 	"github.com/jaredreisinger/committed/pkg/config"
 )
 
-var testHookProgram *tea.Program
+var programTestHook *tea.Program
 
-func Run(cfg *config.Config, existingMsg *commit.Message) (*commit.Message, error) {
+func RunCommitForm(cfg *config.Config, existingMsg *commit.Message) (*commit.Message, error) {
 	m := newCommitForm(cfg, existingMsg)
 
 	p := tea.NewProgram(m)
-	testHookProgram = p
+	programTestHook = p
 
 	finalModel, err := p.Run()
 	if err != nil {
@@ -30,6 +30,31 @@ func Run(cfg *config.Config, existingMsg *commit.Message) (*commit.Message, erro
 	resultMsg, err := tuiModel.Result()
 	if err != nil {
 		return nil, errors.WithMessage(err, "form not completed")
+	}
+
+	return resultMsg, nil
+}
+
+// TODO: set up super-simple editor
+func RunSimpleEditor(existingMsg string) (string, error) {
+	m := newSimpleEditor(existingMsg)
+
+	p := tea.NewProgram(m)
+	programTestHook = p
+
+	finalModel, err := p.Run()
+	if err != nil {
+		return "", err
+	}
+
+	tuiModel, ok := finalModel.(simpleEditor)
+	if !ok {
+		return "", errors.WithMessage(err, "unexpected model type")
+	}
+
+	resultMsg, err := tuiModel.Result()
+	if err != nil {
+		return "", errors.WithMessage(err, "form not completed")
 	}
 
 	return resultMsg, nil

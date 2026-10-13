@@ -20,7 +20,7 @@ func TestRun(t *testing.T) {
 }
 
 func createTempFile(t *testing.T, content string) string {
-	tmpFile := filepath.Join(t.TempDir(), "MSG")
+	tmpFile := filepath.Join(t.TempDir(), "COMMIT_EDITMSG")
 	err := os.WriteFile(tmpFile, []byte(content), defaultPerms)
 	assert.NoError(t, err)
 	return tmpFile

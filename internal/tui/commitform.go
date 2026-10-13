@@ -497,7 +497,7 @@ func (form commitForm) setFocus(focusField field) (commitForm, tea.Cmd) {
 		}
 
 		help := form.children.MustGet(helpField).(helpModel)
-		modelMap[helpField] = help.SetKeyMap(buildHelpKeys(keyBindings))
+		modelMap[helpField] = help.SetKeyMap(buildHelpKeys(defaultKeyMap, keyBindings))
 
 		form.children = form.children.SetMap(modelMap)
 		form.focusedField = focusField

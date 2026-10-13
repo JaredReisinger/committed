@@ -4,10 +4,11 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"slices"
 
 	"github.com/pkg/errors"
 
-	"github.com/jaredreisinger/committed/internal/hook"
+	"github.com/jaredreisinger/committed/internal/git"
 	"github.com/jaredreisinger/committed/internal/tui"
 	"github.com/jaredreisinger/committed/pkg/commit"
 	"github.com/jaredreisinger/committed/pkg/config"
@@ -30,52 +31,70 @@ func Run(args []string, dryRun bool, logFile string) error {
 	}
 	slog.SetDefault(logger)
 
-	slog.Info("logging initialized", "file", logFile)
+	slog.Info("commit initialized", "args", fmt.Sprintf("%s", args), "logFile", logFile, "dryRun", dryRun)
 
-	file, _, _, err := hook.ExtractArgs(args, dryRun)
+	file, messageType, err := git.ExtractArgs(args, dryRun)
 	if err != nil {
 		return errors.WithMessage(err, "error parsing hook arguments")
 	}
 
-	slog.Info("invoked with file", "file", file)
+	slog.Info("invoked with file", "filename", file, "messageType", messageType)
 
-	cfg, err := config.LoadConfig(".")
-	if err != nil {
-		return errors.WithMessage(err, "error loading config")
-	}
+	useCommitForm := slices.Contains([]git.MessageType{git.CommitMessage, git.MergeMessage, git.SquashMessage}, messageType)
 
-	var incoming string
-
-	if file != "" {
-		incoming, err = hook.ReadMessageFile(file)
+	if useCommitForm {
+		cfg, err := config.LoadConfig(".")
 		if err != nil {
-			return errors.WithMessage(err, "error reading commit message")
+			return errors.WithMessage(err, "error loading config")
 		}
-	}
 
-	// ParseMessage should *really* take the config, shouldn't it?
-	msg, err := commit.ParseMessage(incoming)
-	if err != nil {
-		msg = &commit.Message{Body: incoming}
-	}
+		var incoming string
 
-	// Haven't figured out a good way to test the UI yet!
-	if !testBypass {
-		msg, err = tui.Run(cfg, msg)
+		if file != "" {
+			incoming, err = git.ReadMessageFile(file)
+			if err != nil {
+				return errors.WithMessage(err, "error reading commit message")
+			}
+		}
+
+		// ParseMessage should *really* take the config, shouldn't it?
+		msg, err := commit.ParseMessage(incoming)
+		if err != nil {
+			msg = &commit.Message{Body: incoming}
+		}
+
+		// Haven't figured out a good way to test the UI yet!
+		if !testBypass {
+			msg, err = tui.RunCommitForm(cfg, msg)
+			if err != nil {
+				return err
+			}
+		}
+
+		formattedMessage := msg.Format(cfg)
+		if !dryRun {
+			err = git.WriteMessageFile(file, formattedMessage)
+			if err != nil {
+				return errors.WithMessage(err, "error writing commit message")
+			}
+		} else {
+			fmt.Printf("\nDRY-RUN: committed would have written:\n---\n%s---\n", formattedMessage)
+		}
+	} else {
+		msg, err := tui.RunSimpleEditor("")
 		if err != nil {
 			return err
 		}
-	}
-
-	formattedMessage := msg.Format(cfg)
-	if !dryRun {
-		err = hook.WriteMessageFile(file, formattedMessage)
-		if err != nil {
-			return errors.WithMessage(err, "error writing commit message")
+		if !dryRun {
+			fmt.Printf("\nNYI: committed would have written:\n---\n%s---\n", msg)
+			err = nil
+			// err = git.WriteMessageFile(file, formattedMessage)
+			if err != nil {
+				return errors.WithMessage(err, "error writing file")
+			}
+		} else {
+			fmt.Printf("\nDRY-RUN: committed would have written:\n---\n%s---\n", msg)
 		}
-	} else {
-		fmt.Printf("\nDRY-RUN: committed would have written:\n---\n%s---\n", formattedMessage)
 	}
-
 	return nil
 }
