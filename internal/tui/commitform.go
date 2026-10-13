@@ -5,7 +5,6 @@ import (
 	"slices"
 	"strings"
 
-	"charm.land/bubbles/v2/help"
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -17,19 +16,46 @@ import (
 	"github.com/jaredreisinger/committed/pkg/teautil"
 )
 
-// field is kind of a hybrid child model ID and tab-order value
+// field is the key for child models
 type field int
 
 const (
-	// this is also the tab order
+	// this is *not* the tab order
 	typeField field = iota
 	typeList
 	scopeField
 	descField
 	bodyField
+
+	// I'm considering have 2 footer fields per footer, as per Conventional
+	// Commits spec items 8, 9, and 10:
+	//
+	// 8. One or more footers MAY be provided one blank line after the body.
+	// Each footer MUST consist of a word token, followed by either a :<space>
+	// or <space># separator, followed by a string value (this is inspired by
+	// the git trailer convention).
+	//
+	// 9. A footer’s token MUST use - in place of whitespace characters, e.g.,
+	// Acked-by (this helps differentiate the footer section from a
+	// multi-paragraph body). An exception is made for BREAKING CHANGE, which
+	// MAY also be used as a token.
+	//
+	// 10. A footer’s value MAY contain spaces and newlines, and parsing MUST
+	// terminate when the next valid footer token/separator pair is observed.
+	//
+	// The challenge is in figuring out "who" is responsible for the 2-value
+	// management; I think getting the layout right makes it need to be the
+	// form, but it would be nice to encapsulate the tabbing... but, meh?
 	footerField
-	// help?
+
+	// footerToken1Field
+	// footerValue1Field
+	// ...
+
+	// helpField ?  I'm not sure it follows a true tea.Model pattern
+	helpField
 	maxField
+	noField field = -1
 )
 
 // commitForm represents the TUI state for conventional commit composition.
@@ -50,7 +76,7 @@ type commitForm struct {
 
 	winWidth  int
 	winHeight int
-	help      help.Model // move to children?
+	// help      help.Model // move to children?
 
 	limits FieldVals[Limits]
 
@@ -76,9 +102,9 @@ func newCommitForm(cfg *config.Config, existingMsg *commit.Message) commitForm {
 		initialBody = existingMsg.Body
 	}
 
-	help := help.New()
-	help.ShowAll = true
-	help.SetWidth(80) // ??
+	// help := help.New()
+	// help.ShowAll = true
+	// help.SetWidth(80) // ??
 
 	// get field limits from configuration
 	limits := FieldVals[Limits]{
@@ -136,14 +162,15 @@ func newCommitForm(cfg *config.Config, existingMsg *commit.Message) commitForm {
 			descField:   text.New(false, "description", initialDesc).SetCharLimit(limits.descWidth.max),
 			bodyField:   text.New(true, "message body", initialBody).SetMaxContentHeight(100).SetDynamicHeight(true).SetMinHeight(4),
 			footerField: text.New(true, "footer", initialFooter).SetMaxContentHeight(50).SetMinHeight(1),
+			helpField:   newHelpModel(),
 		}),
 
 		fieldErrs: make(map[field]error, maxField),
 
 		tabstops:     tabstops,
-		focusedField: tabstops[0],
+		focusedField: noField,
 
-		help:   help,
+		// help:   help,
 		limits: limits,
 	}
 
@@ -163,7 +190,7 @@ func (form commitForm) Init() tea.Cmd {
 	// should other processing happen here?
 	// return textinput.Blink
 	// Set initial focus
-	return nil //setFocusCmd(typeList)
+	return setFocusCmd(form.tabstops[0])
 }
 
 type setFocusMsg struct {
@@ -192,8 +219,12 @@ func (form commitForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// tricks to ensure the field isn't scrolled weirdly.
 		switch form.focusedField {
 		case typeField, scopeField:
-			t2 := form.children.MustGet(form.focusedField).(text.Model).MoveToBegin().MoveToEnd()
-			form.children = form.children.Set(form.focusedField, t2)
+			if child, ok := form.children.Get(form.focusedField); ok {
+				if t, ok := child.(text.Model); ok {
+					t2 := t.MoveToBegin().MoveToEnd()
+					form.children = form.children.Set(form.focusedField, t2)
+				}
+			}
 		}
 
 		form, cmd = form.setFocus(msgT.field)
@@ -285,6 +316,7 @@ func (form commitForm) resize(winWidth int, winHeight int) commitForm {
 	desc := form.children.MustGet(descField).(text.Model)
 	body := form.children.MustGet(bodyField).(text.Model)
 	footer := form.children.MustGet(footerField).(text.Model)
+	help := form.children.MustGet(helpField).(helpModel)
 
 	// Set up the calculateSizes structure... could we cache a lot of this?
 	// Might need to alter the constraints to not include current content size.
@@ -316,7 +348,7 @@ func (form commitForm) resize(winWidth int, winHeight int) commitForm {
 	body = body.SetWidth(sizes.bodyWidth.max).SetMinHeight(sizes.bodyHeight.min).SetMaxHeight(sizes.bodyHeight.max)
 	footer = footer.SetWidth(sizes.footerWidth.max).SetMinHeight(sizes.footerHeight.min).SetMaxHeight(sizes.footerHeight.max)
 
-	form.help.SetWidth(winWidth) // this *should* return an updated model!
+	help = help.SetWidth(winWidth)
 
 	form.children = form.children.SetMap(map[field]tea.Model{
 		typeField:   typ,
@@ -324,6 +356,7 @@ func (form commitForm) resize(winWidth int, winHeight int) commitForm {
 		descField:   desc,
 		bodyField:   body,
 		footerField: footer,
+		helpField:   help,
 	})
 
 	return form
@@ -426,29 +459,46 @@ type Focuser interface {
 
 // updateFocus updates which field is currently focused.
 func (form commitForm) setFocus(focusField field) (commitForm, tea.Cmd) {
-	modelMap := map[field]tea.Model{}
 	var cmds []tea.Cmd
-	var cmd tea.Cmd
 
-	// instead of a full loop, we could just blur the previous field!
-	for f := range maxField {
-		if child, ok := form.children.Get(f); ok {
-			c2 := child
-			focuser, ok := c2.(Focuser)
-			if ok {
-				if f == focusField {
-					c2, cmd = focuser.Focus()
-				} else {
-					c2, cmd = focuser.Blur()
+	if form.focusedField != focusField {
+		modelMap := make(map[field]tea.Model, 3)
+
+		// it's a "loop" just so we don't have to duplicate the "get from
+		// router"/"set to router" logic
+		for _, f := range []field{form.focusedField, focusField} {
+			if child, ok := form.children.Get(f); ok {
+				c2 := child
+				var cmd tea.Cmd
+				if focuser, ok := c2.(Focuser); ok {
+					if f == focusField {
+						c2, cmd = focuser.Focus()
+					} else {
+						c2, cmd = focuser.Blur()
+					}
+
+					modelMap[f] = c2
+					cmds = append(cmds, teautil.Wrap(cmd, f))
 				}
 			}
-
-			modelMap[f] = c2
-			cmds = append(cmds, teautil.Wrap(cmd, f))
 		}
+
+		// Also update the help keymap... we *could* do this inside the loop to
+		// avoid calling form.children.Get() again, but since we're casting to a
+		// different interface, this seems cleaner.
+		var keyBindings []key.Binding
+		if child, ok := form.children.Get(focusField); ok {
+			if keyBinder, ok := child.(KeyBinder); ok {
+				keyBindings = keyBinder.GetKeyBindings()
+			}
+		}
+
+		help := form.children.MustGet(helpField).(helpModel)
+		modelMap[helpField] = help.SetKeyMap(buildHelpKeys(keyBindings))
+
+		form.children = form.children.SetMap(modelMap)
+		form.focusedField = focusField
 	}
-	form.children = form.children.SetMap(modelMap)
-	form.focusedField = focusField
 
 	return form, tea.Batch(cmds...)
 }
@@ -505,6 +555,9 @@ func (form commitForm) View() tea.View {
 		info.view = child.View().Content
 		info.valid = form.fieldErrs[f] == nil
 
+		// REVIEW: should the validation/border be restricted to the text
+		// fields, with typeList and help handled *compeltely* separately?
+
 		// Figure out the decorator; depends on whether the field is valid, etc.
 		// This also depends on where the focus is, as we play some interesting
 		// games with borders to keep the rendering concise.
@@ -523,7 +576,8 @@ func (form commitForm) View() tea.View {
 		}
 
 		// TODO: make an interface for styling single/multi...
-		if f == typeList || child.(text.Model).IsArea() {
+		textChild, ok := child.(text.Model)
+		if f == typeList || (ok && textChild.IsArea()) {
 			childKind = multi
 		}
 
@@ -545,6 +599,8 @@ func (form commitForm) View() tea.View {
 			if form.focusedField < footerField {
 				border = border.UnsetBorderTop()
 			}
+		case helpField:
+			border = lipgloss.NewStyle() // no border!
 		}
 
 		info.render = border.Render(info.view)
@@ -565,19 +621,6 @@ func (form commitForm) View() tea.View {
 		slog.Debug("showing error", "err", errMsg)
 		errMsg = lipgloss.NewStyle().Width(form.winWidth).Foreground(defaultColors[invalid][focused][decoration]).Render(errMsg)
 	}
-
-	// get the focused field key bindings...
-	var keyBindings []key.Binding
-	keyBinder, ok := form.children.MustGet(form.focusedField).(KeyBinder)
-	if ok {
-		keyBindings = keyBinder.GetKeyBindings()
-	}
-
-	// It seems ridiculous to recalculate the keymap on every single view, but
-	// with an immutable pattern, we *can't* know if we have the same value call
-	// after call. On the plus side, this should be a very fast calculation (and
-	// maybe we can memoize the values and keep a pre-rendered view?)
-	helpKeys := buildHelpKeys(keyBindings)
 
 	// For the top line, we omit unused scope unless it has focus
 	showScope := form.focusedField == scopeField || form.children.MustGet(scopeField).(text.Model).Value() != ""
@@ -621,7 +664,8 @@ func (form commitForm) View() tea.View {
 	mainView = lipgloss.JoinVertical(
 		lipgloss.Left,
 		mainView,
-		form.help.View(helpKeys), // &defaultKeyMap),
+		// form.help.View(helpKeys), // &defaultKeyMap),
+		infos[helpField].render,
 	)
 
 	layers := []*lipgloss.Layer{
@@ -645,11 +689,10 @@ func (form commitForm) Result() (*commit.Message, error) {
 
 	texts := make(map[field]string, form.children.Len())
 
-	for f, t := range form.children.All() {
-		if f == typeList {
-			continue
+	for f, child := range form.children.All() {
+		if textChild, ok := child.(text.Model); ok {
+			texts[f] = strings.TrimSpace(textChild.Value())
 		}
-		texts[f] = strings.TrimSpace(t.(text.Model).Value())
 	}
 
 	// if !m.done {

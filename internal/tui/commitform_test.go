@@ -16,8 +16,11 @@ func TestNewModel(t *testing.T) {
 	m := newCommitForm(cfg, nil)
 
 	assert.NotNil(t, m.config)
-	assert.Equal(t, typeList, m.focusedField)
+	assert.Equal(t, noField, m.focusedField)
 	assert.NotEmpty(t, m.config.Rules.TypeEnum.Value)
+
+	cmd := m.Init()
+	assert.NotNil(t, cmd)
 }
 
 func TestNewModel_WithExistingMessage(t *testing.T) {

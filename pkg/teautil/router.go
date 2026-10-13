@@ -2,6 +2,7 @@ package teautil
 
 import (
 	"iter"
+	"log/slog"
 	"maps"
 
 	tea "charm.land/bubbletea/v2"
@@ -139,6 +140,7 @@ func (r Router[K, M]) SetMap(modelMap map[K]M) Router[K, M] {
 // automatically wrapped via [Wrap] so that any resulting [tea.Msg] will be
 // routed directly back to that child.
 func (r Router[K, M]) Update(msg tea.Msg, defaultKey K) (Router[K, M], tea.Cmd) {
+	slog.Debug("router Update", "msgIn", msg, "defaultKey", defaultKey)
 	// Should we add a fallback in case someone wraps using an int instead of a
 	// known type?  Or at least an "if !ok but .(WrappedMsg[int])?"
 	var keys iter.Seq[K]
@@ -166,19 +168,23 @@ func (r Router[K, M]) UpdateAll(msg tea.Msg) (Router[K, M], tea.Cmd) {
 }
 
 func (r Router[K, M]) update(msg tea.Msg, keys iter.Seq[K]) (Router[K, M], tea.Cmd) {
+	slog.Debug("router update", "msgIn", msg, "keys", keys)
 	var cmds []tea.Cmd
 
 	rr := r.clone()
 	for k := range keys {
-		updatedChildModel, cmd := r.models[k].Update(msg)
-		rr.models[k] = updatedChildModel.(M)
-		cmds = append(cmds, Wrap(cmd, k))
+		if child, ok := r.models[k]; ok {
+			updatedChildModel, cmd := child.Update(msg)
+			rr.models[k] = updatedChildModel.(M)
+			cmds = append(cmds, Wrap(cmd, k))
+		}
 	}
 
 	return rr, tea.Batch(cmds...)
 }
 
 func singleSeq[K comparable](key K) iter.Seq[K] {
+	slog.Debug("router singleSeq" /* , "key", key */)
 	return func(yield func(K) bool) {
 		yield(key)
 	}
