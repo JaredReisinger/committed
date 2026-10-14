@@ -6,12 +6,6 @@ vars:
   COV_DIR: .coverage
 
 tasks:
-  temp_diagnostics:
-    desc: quick check to see how to manage GITHUB_OUTPUT
-    cmds:
-      - echo "GITHUB_OUTPUT appears to be [${GITHUB_OUTPUT}]"
-      - exit 1
-
   prepare:
     desc: one-time post-clone repo setup
     cmds:
@@ -131,8 +125,8 @@ tasks:
       - git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
       - git tag -a "{{.VERSION}}" -m "release {{.VERSION}}"
       - git push --tags
-      - echo "do_release=true" >> "$GITHUB_OUTPUT"
-      - echo "version={{.VERSION}}" >> "$GITHUB_OUTPUT"
+      - echo "do_release=true" >> "${GITHUB_OUTPUT}"
+      - echo "version={{.VERSION}}" >> "${GITHUB_OUTPUT}"
 
   release:test:
     desc: test the release process

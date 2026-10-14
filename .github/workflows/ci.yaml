@@ -18,14 +18,6 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: TEMPORARY DIAGNOSTICS
-        run: |
-          go mod download
-          go tool task temp_diagnostics
-
-      # we're using task as a tool now, so we don't need this?
-      # - uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2.2.0
-
       - name: Run lint, test, and build
         run: |
           go mod download
@@ -67,16 +59,11 @@ jobs:
         with:
           go-version-file: go.mod
 
-      # we're using task as a tool now, so we don't need this?
-      # - uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2.2.0
-
       - name: Check if release is needed
         id: check-bump
-        env:
-          GITHUB_OUTPUT: ${{ env.GITHUB_OUTPUT }}
         run: |
           go mod download
-          go tool task tag-release
+          GITHUB_OUTPUT="${GITHUB_OUTPUT}" go tool task tag-release
 
       - if: ${{ steps.check-bump.output.do_release == 'true' }}
         name: Install syft tools
