@@ -18,6 +18,17 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - run: |
+          go mod download
+          go tool task temp_diagnostics
+        id: temp_test
+
+      - run: |
+          echo "looking for temp_test output..."
+          echo "temp_test.foo is: [${{ steps.temp_test.outputs.foo }}]"
+          exit 1
+
+
       - name: Run lint, test, and build
         run: |
           go mod download
@@ -63,14 +74,14 @@ jobs:
         id: check-bump
         run: |
           go mod download
-          GITHUB_OUTPUT="${GITHUB_OUTPUT}" go tool task tag-release
+          go tool task tag-release
 
-      - if: ${{ steps.check-bump.output.do_release == 'true' }}
+      - if: ${{ steps.check-bump.outputs.do_release == 'true' }}
         name: Install syft tools
         run: |
           curl -sSfL https://get.anchore.io/syft | sudo sh -s -- -b /usr/local/bin
 
-      - if: ${{ steps.check-bump.output.do_release == 'true' }}
+      - if: ${{ steps.check-bump.outputs.do_release == 'true' }}
         run: task release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
