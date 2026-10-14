@@ -81,9 +81,12 @@ func Run(args []string, dryRun bool, logFile string) error {
 			fmt.Printf("\nDRY-RUN: committed would have written:\n---\n%s---\n", formattedMessage)
 		}
 	} else {
-		msg, err := tui.RunSimpleEditor("")
-		if err != nil {
-			return err
+		var msg string
+		if !testBypass {
+			msg, err = tui.RunSimpleEditor("")
+			if err != nil {
+				return err
+			}
 		}
 		if !dryRun {
 			fmt.Printf("\nNYI: committed would have written:\n---\n%s---\n", msg)

@@ -9,7 +9,11 @@ import (
 )
 
 func TestExtractArgs(t *testing.T) {
-	const file = "/path/to/.git/COMMIT_EDITMSG"
+	const commitFile = "/path/to/.git/COMMIT_EDITMSG"
+	const mergeFile = "/path/to/.git/MERGE_MSG"
+	const squashFile = "/path/to/.git/SQUASH_MSG"
+	const tagFile = "/path/to/.git/TAG_EDITMSG"
+	const rebaseFile = "/path/to/.git/git-rebase-todo"
 
 	tests := []struct {
 		name                string
@@ -33,27 +37,58 @@ func TestExtractArgs(t *testing.T) {
 		},
 		{
 			name:                "minimum args",
-			args:                []string{file},
-			expectedFile:        file,
+			args:                []string{commitFile},
+			expectedFile:        commitFile,
 			expectedMessageType: CommitMessage,
 		},
 		{
 			name:                "with source type",
-			args:                []string{file, "message"},
-			expectedFile:        file,
+			args:                []string{commitFile, "message"},
+			expectedFile:        commitFile,
 			expectedMessageType: CommitMessage,
 		},
 		{
 			name:                "with source and object",
-			args:                []string{file, "commit", "abc123"},
-			expectedFile:        file,
+			args:                []string{commitFile, "commit", "abc123"},
+			expectedFile:        commitFile,
 			expectedMessageType: CommitMessage,
 		},
 		{
 			name:                "extra args ignored",
-			args:                []string{file, "merge", "abc123", "extra"},
-			expectedFile:        file,
+			args:                []string{commitFile, "merge", "abc123", "extra"},
+			expectedFile:        commitFile,
 			expectedMessageType: CommitMessage,
+		},
+		{
+			name:                "merge",
+			args:                []string{mergeFile},
+			expectedFile:        mergeFile,
+			expectedMessageType: MergeMessage,
+		},
+		{
+			name:                "squash",
+			args:                []string{squashFile},
+			expectedFile:        squashFile,
+			expectedMessageType: SquashMessage,
+		},
+		{
+			name:                "tag",
+			args:                []string{tagFile},
+			expectedFile:        tagFile,
+			expectedMessageType: TagMessage,
+		},
+		{
+			name:                "rebase",
+			args:                []string{rebaseFile},
+			expectedFile:        rebaseFile,
+			expectedMessageType: RebasePicker,
+		},
+		{
+			name:                "unknown file",
+			args:                []string{"UNKNOWN"},
+			expectedFile:        "",
+			expectedMessageType: UnknownMessage,
+			hasError:            true,
 		},
 	}
 

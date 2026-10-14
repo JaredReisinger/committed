@@ -14,18 +14,8 @@ import (
 )
 
 func TestRunCommitForm(t *testing.T) {
-	// t.Skip("getting a `makeslice: len out of range` in textinput")
-
-	// // This doesn't seem to run under GitHub Actions...
-	// if os.Getenv("CI") == "true" {
-	// 	t.Skip("TTY error trying to run in GitHub Actions")
-	// 	return // technically not needed
-	// }
-
 	cfg := config.DefaultConfig()
-
 	m := newCommitForm(cfg, &commit.Message{})
-
 	testModel := teatest.NewTestModel(t, m)
 
 	testModel.Send(tea.KeyPressMsg{Code: tea.KeyDown}) // build->chore
@@ -60,4 +50,24 @@ func TestRunCommitForm(t *testing.T) {
 		Description: "testing 1 2 3",
 		Body:        "this is the body",
 	}, msg)
+}
+
+func TestRunSimpleEditor(t *testing.T) {
+	m := newSimpleEditor("")
+	testModel := teatest.NewTestModel(t, m)
+
+	testModel.Send(tea.KeyPressMsg{Code: tea.KeyDown}) // dummy...
+
+	testModel.Type("foo")
+
+	testModel.Quit()
+	testModel.WaitFinished(t, teatest.WithFinalTimeout(time.Second))
+
+	finalModel := testModel.FinalModel(t)
+	simpleEditor2, ok := finalModel.(simpleEditor)
+	assert.True(t, ok)
+
+	msg, err := simpleEditor2.Result()
+	assert.NoError(t, err)
+	assert.Equal(t, "foo", msg)
 }
