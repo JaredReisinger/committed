@@ -50,12 +50,13 @@ jobs:
 
       - uses: go-task/setup-task@v2
 
-      - name: get syft
-        run: |
-          curl -sSfL https://get.anchore.io/syft | sudo sh -s -- -b /usr/local/bin
-
       - id: check-bump
         run: task tag-release
+
+      - if: ${{ steps.check-bump.output.do_release == 'true' }}
+        name: get syft
+        run: |
+          curl -sSfL https://get.anchore.io/syft | sudo sh -s -- -b /usr/local/bin
 
       - if: ${{ steps.check-bump.output.do_release == 'true' }}
         run: task release
