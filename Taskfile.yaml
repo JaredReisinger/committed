@@ -6,11 +6,6 @@ vars:
   COV_DIR: .coverage
 
 tasks:
-  temp_diagnostics:
-    desc: temp
-    cmds:
-      - echo "foo=bar" >> "${GITHUB_OUTPUT}"
-
   prepare:
     desc: one-time post-clone repo setup
     cmds:
