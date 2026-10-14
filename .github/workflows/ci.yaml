@@ -71,7 +71,7 @@ jobs:
           curl -sSfL https://get.anchore.io/syft | sudo sh -s -- -b /usr/local/bin
 
       - if: ${{ steps.check-bump.outputs.do_release == 'true' }}
-        run: task release
+        run: go tool task release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
