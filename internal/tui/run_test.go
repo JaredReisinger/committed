@@ -18,12 +18,19 @@ func TestRunCommitForm(t *testing.T) {
 	m := newCommitForm(cfg, &commit.Message{})
 	testModel := teatest.NewTestModel(t, m)
 
+	// We seem to have a small race condition where *one* of the "key down"
+	// messages is lost... not sure if it's as the program starts up, or at the
+	// end... we pad each with a small sleep to see if we can make it more
+	// stable.
+	time.Sleep(time.Second)
 	testModel.Send(tea.KeyPressMsg{Code: tea.KeyDown}) // build->chore
 	testModel.Send(tea.KeyPressMsg{Code: tea.KeyDown}) // chore->ci
 	testModel.Send(tea.KeyPressMsg{Code: tea.KeyDown}) // ci->docs
 	testModel.Send(tea.KeyPressMsg{Code: tea.KeyDown}) // docs->feat
 	testModel.Send(tea.KeyPressMsg{Code: tea.KeyDown}) // feat->fix
-	testModel.Send(tea.KeyPressMsg{Code: tea.KeyTab})  // accept "fix" -> scope
+	time.Sleep(time.Second)
+
+	testModel.Send(tea.KeyPressMsg{Code: tea.KeyTab}) // accept "fix" -> scope
 
 	testModel.Type("foo")
 
