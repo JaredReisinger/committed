@@ -35,6 +35,8 @@ jobs:
       # also upload the coverage to codacy
       - run: |
           bash <(curl -Ls https://coverage.codacy.com/get.sh) report --force-coverage-parser go -r .coverage/coverage.out
+        env:
+          CODACY_PROJECT_TOKEN: ${{ secrets.CODACY_PROJECT_TOKEN }}
 
       # doing a release:test is likely overkill... unless we're hitting issues
       # where the build is successful, and we bump the version, and yet the
