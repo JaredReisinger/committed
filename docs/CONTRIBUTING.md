@@ -7,14 +7,12 @@ The following is a set of guidelines and expectations for contributing to commit
 #### Table of contents
 
 <!-- TOC depthfrom:2 depthto:3 orderedlist:false updateonsave:true -->
-
 - [Code of conduct](#code-of-conduct)
 - [I just have a question!](#i-just-have-a-question)
 - [How can I contribute?](#how-can-i-contribute)
   - [Reporting bugs](#reporting-bugs)
   - [Suggesting enhancements](#suggesting-enhancements)
-  - [Pull requests](#pull-requests)
-
+  - [Pull requests / development](#pull-requests--development)
 <!-- /TOC -->
 
 ## Code of conduct

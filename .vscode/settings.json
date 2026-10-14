@@ -34,5 +34,5 @@
         "textinput",
         "textinputs"
     ],
-    "coverage-gutters.coverageReportFileName": ".coverage/coverage.html",
+    "coverage-gutters.coverageReportFileName": ".coverage/coverage.html"
 }
