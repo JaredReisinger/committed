@@ -15,6 +15,7 @@
         "gomod",
         "GOPATH",
         "goreleaser",
+        "govulncheck",
         "infile",
         "jsontext",
         "keymap",

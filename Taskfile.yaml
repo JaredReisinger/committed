@@ -86,6 +86,7 @@ tasks:
     desc: run go vet as a lightweight lint step
     cmds:
       - go vet ./...
+      - go tool govulncheck ./...
 
   vhs:
     desc: create demo video
