@@ -54,9 +54,11 @@ jobs:
         run: |
           curl -sSfL https://get.anchore.io/syft | sudo sh -s -- -b /usr/local/bin
 
-      - run: task tag-release
+      - id: check-bump
+        run: task tag-release
 
-      - run: task release
+      - if: ${{ steps.check-bump.output.do_release == 'true' }}
+        run: task release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

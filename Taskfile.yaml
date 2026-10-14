@@ -124,6 +124,8 @@ tasks:
       - git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
       - git tag -a "{{.VERSION}}" -m "release {{.VERSION}}"
       - git push --tags
+      - echo "do_release=true" >> "$GITHUB_OUTPUT"
+      - echo "version={{.VERSION}}" >> "$GITHUB_OUTPUT"
 
   release:test:
     desc: test the release process
