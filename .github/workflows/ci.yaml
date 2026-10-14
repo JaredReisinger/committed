@@ -21,19 +21,21 @@ jobs:
       # we're using task as a tool now, so we don't need this?
       # - uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2.2.0
 
-      - name: lint, test, and build
+      - name: Run lint, test, and build
         run: |
           go mod download
           go tool task lint
           go tool task test
           go tool task build
 
-      - uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # 7.1.1
+      - name: Upload test coverage to Codecov
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # 7.1.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
 
       # also upload the coverage to codacy
-      - run: |
+      - name: Upload test coverage to Codacy
+        run: |
           bash <(curl -Ls https://coverage.codacy.com/get.sh) report --force-coverage-parser go -r .coverage/coverage.out
         env:
           CODACY_PROJECT_TOKEN: ${{ secrets.CODACY_PROJECT_TOKEN }}
@@ -63,13 +65,16 @@ jobs:
       # we're using task as a tool now, so we don't need this?
       # - uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2.2.0
 
-      - id: check-bump
+      - name: Check if release is needed
+        id: check-bump
+        env:
+          GITHUB_OUTPUT: ${{ env.GITHUB_OUTPUT }}
         run: |
           go mod download
           go tool task tag-release
 
       - if: ${{ steps.check-bump.output.do_release == 'true' }}
-        name: get syft
+        name: Install syft tools
         run: |
           curl -sSfL https://get.anchore.io/syft | sudo sh -s -- -b /usr/local/bin
 
